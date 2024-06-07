@@ -12,11 +12,18 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
+- The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-The author(s), the software, and the "list of publications detailing the software"
+- The author(s), the software, and the "list of publications detailing the software"
 shall be cited in all copies or substantial portions of the Software.
+
+- The list of publications detailing the software are given in the document called
+"CITATIONS.bib" in the repository.
+
+- The list of publications detailing the software may be updated with future versions
+of the software. The list of publications should also be updated when citing future
+versions of the software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
