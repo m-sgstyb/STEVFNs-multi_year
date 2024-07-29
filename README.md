@@ -1,2 +1,10 @@
 # STEVFNs-DPhil-MSB
-Repository containing my STEFVNs modelling for doctoral thesis work, separate from the original STEVFNs model for easier tracking
+This repository contains an instance of the [STEVFNs](https://github.com/OmNomNomzzz/STEVFNs) model, adapted for the case study in my doctoral thesis.
+As an instance of the original software, this code is licensed under an MIT license (please see LICENSE and Citations.bib files for details).
+Please also see the NOTICE file to find the license for dependent software used in this model.
+
+## Case Study
+The code and data here present a case study for long-distance HVDC interconnections for renewable energy trade in the Americas. 
+
+
+
