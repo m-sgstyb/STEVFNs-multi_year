@@ -7,4 +7,8 @@ Please also see the NOTICE file to find the license for dependent software used 
 The code and data here present a case study for long-distance HVDC interconnections for renewable energy trade in the Americas. 
 
 
+## Documentation
+Assumptions and discussion of the data can be found in the thesis.
+
+
 
