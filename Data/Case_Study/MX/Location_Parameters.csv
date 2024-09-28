@@ -1,2 +1,5 @@
-Location,lat,lon
-0,29.16,-10.29
+Location,lat,lon,location_name
+0,19.05738,-104.2754,MX
+1,44.57452,-124.06474,US
+2,,,CA
+3,,,CL
