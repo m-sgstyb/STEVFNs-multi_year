@@ -13,3 +13,4 @@ Type,sizing_constant,sizing_constant_unit,usage_constant_1,usage_constant_1_unit
 11,1.04,G$/GWp,5.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000568,MtCO2e/GWh,SA
 12,1.04,G$/GWp,5.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.00096398,MtCO2e/GWh,IN
 13,1.04,G$/GWp,5.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000413675,MtCO2e/GWh,AE
+14,1.214,G$/GWp,5.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000405,MtCO2e/GWh,MX

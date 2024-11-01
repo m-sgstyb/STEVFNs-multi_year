@@ -27,3 +27,4 @@ Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_siz
 25,0.616533612,G$/GWp,262800,h,PVOUT,24,0,3.27E-01,GWp,SA_BAU
 26,0.616533612,G$/GWp,262800,h,PVOUT,24,0,1.18E+02,GWp,IN_BAU
 27,0.616533612,G$/GWp,262800,h,PVOUT,24,0,6.18E+00,GWp,AE_BAU
+28,0.8,G$/GWp,262800,h,PVOUT,24,0,2587.942383,GWp,MEX
