@@ -1,5 +1,4 @@
 Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,existing_capacity,existing_capacity_unit,location_name
 0,0,G$/GWp,175200,h,WINDOUT,24,0,7.318,GWp,MX
 1,0,G$/GWp,175200,h,WINDOUT,24,0,147.979,GWp,US
-2,0,G$/GWp,175200,h,WINDOUT,24,0,16.989,GWp,CA
-3,0,G$/GWp,175200,h,WINDOUT,24,0,4.51,GWp,CL
+2,0,G$/GWp,175200,h,WINDOUT,24,0,4.51,GWp,CL
