@@ -19,22 +19,24 @@ import numpy as np
 
 from Code.Network.Network import Network_STEVFNs
 from Code.Plotting import DPhil_Plotting
-from Code.Results import Results
+from Code.Plotting import mitigation_plots
+from Code.Results import get_costs_sizes
 from Code.Results import get_flows
 
 
 #### Define Input Files ####
-case_study_name = "US"
-
+case_study_name = "MX-CL_Collab"
 
 base_folder = os.path.dirname(__file__)
 data_folder = os.path.join(base_folder, "Data")
 case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
 scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
+
 #### Define Output Files ####
-results_filename = os.path.join(case_study_folder, "total_data.csv")
-unrounded_results_filename = os.path.join(case_study_folder, "total_data_unrounded.csv")
+rounded_results_filename = os.path.join(case_study_folder, "results_rounded.csv")
+results_filename = os.path.join(case_study_folder, "results.csv")
+flows_filename = os.path.join(case_study_folder, "flows.csv")
 
 ### Read Network Structure ###
 network_structure_df = pd.read_csv(network_structure_filename)
@@ -57,8 +59,6 @@ for counter1 in range(len(scenario_folders_list)):
     asset_parameters_filename = os.path.join(scenario_folder, "Asset_Parameters.csv")
     location_parameters_filename = os.path.join(scenario_folder, "Location_Parameters.csv")
     system_parameters_filename = os.path.join(scenario_folder, "System_Parameters.csv")
-    # Define flow results file output
-    flows_filename =  os.path.join(scenario_folder, "flows.csv")
     
     asset_parameters_df = pd.read_csv(asset_parameters_filename)
     location_parameters_df = pd.read_csv(location_parameters_filename)
@@ -75,11 +75,8 @@ for counter1 in range(len(scenario_folders_list)):
     
     ### Run Simulation ###
     start_time = time.time()
-    # my_network.solve_problem()
-    # my_network.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=10000, verbose=False,
-    #                           ignore_dpp=True,# Uncomment to disable DPP. DPP will make the first scenario run slower, but subsequent scenarios will run significantly faster.
-    #                          )
     my_network.problem.solve(solver = cp.MOSEK)
+    # my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000)
     # my_network.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=10000, feastol=1e-5, reltol=1e-5, abstol=1e-5, ignore_dpp=True, verbose=False)
     # my_network.problem.solve(solver = cp.SCS, warm_start=True, max_iters=10000, ignore_dpp=True, verbose=False)
     end_time = time.time()
@@ -96,26 +93,27 @@ for counter1 in range(len(scenario_folders_list)):
     DPhil_Plotting.plot_asset_sizes(my_network)
     
     # Save results for asset flows per scenario
-    get_flows.export_AUT_Flows(my_network).to_csv(flows_filename)
+    get_flows.export_aut_flows(my_network).to_csv(flows_filename)
     
     ### Export cost results to pandas dataframe for each scenario
-    t_df = Results.export_total_data(my_network, location_parameters_df, asset_parameters_df)
-    t1_df = Results.export_total_data_not_rounded(my_network, location_parameters_df, asset_parameters_df)
+    t_df = get_costs_sizes.get_total_data(my_network, location_parameters_df, asset_parameters_df)
+    t1_df = get_costs_sizes.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
     if counter1 == 0:
         total_df = t_df
         total_df_1 = t1_df
     else:
+        # Concatenate next scenario's results into one dataframe
         total_df = pd.concat([total_df, t_df], ignore_index=True)
         total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
+        
+    flows_df = get_flows.export_collab_flows(my_network, location_parameters_df)
+    
 
 # Save Result for all scenarios into a single csv file
 total_df.to_csv(results_filename, index=False, header=True)
-total_df_1.to_csv(unrounded_results_filename, index=False, header=True)
+total_df_1.to_csv(rounded_results_filename, index=False, header=True)
 
-
-
-
-
+flows_df.to_csv(flows_filename, index=False, header=True)
 
 
 ## Manual plotting 
