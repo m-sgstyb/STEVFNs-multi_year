@@ -5,7 +5,7 @@ Created on Fri Nov 15 18:00:38 2024
 
 @author: Mónica Sagastuy-Breña
 
-Plotting script for DPhil case study results
+Plotting script for DPhil case study results as mitigation curve
 """
 
 import pandas as pd
