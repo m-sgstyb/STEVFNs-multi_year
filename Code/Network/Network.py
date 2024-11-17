@@ -100,12 +100,8 @@ class Network_STEVFNs:
         return
     
     def solve_problem(self):
-        # self.problem.solve()
-        # self.problem.solve(warm_start=True)# This can sometimes use OSQP solver that sometimes gives errors.
-        self.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=1000)
-        # self.problem.solve(solver = cp.OSQP, warm_start=True)
-        # self.problem.solve(solver = cp.CVXOPT, warm_start=True)
-        # self.problem.solve(solver = cp.SCS, warm_start=True)
+        self.problem.solve(solver = cp.CLARABEL, max_iter=10000)
+        # self.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=1000)
         return
     
     def satisfy_net_loads(self):
