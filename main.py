@@ -22,18 +22,29 @@ from Code.Plotting import mitigation_plots
 from Code.Results import Results
 
 #### Define Input Files ####
-case_study_name = "MX-CL_Collab"
+case_study_name = "MX"
 
 base_folder = os.path.dirname(__file__)
 data_folder = os.path.join(base_folder, "Data")
 case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
-scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
+results_folder = os.path.join(case_study_folder, "Results")
+if not os.path.exists(results_folder):
+    os.makedirs(results_folder)
+
+scenario_folders_list = []
+for folder in os.listdir(case_study_folder):
+    full_path = os.path.join(case_study_folder, folder)
+    # Check if the item is a folder and starts with 'scenario_'
+    if os.path.isdir(full_path) and folder.startswith('scenario_'):
+        scenario_folders_list.append(full_path)
+    
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
 #### Define Output Files ####
-rounded_results_filename = os.path.join(case_study_folder, "results_rounded.csv")
-results_filename = os.path.join(case_study_folder, "results.csv")
-flows_filename = os.path.join(case_study_folder, "flows.csv")
+rounded_results_filename = os.path.join(results_folder, "results_rounded.csv")
+results_filename = os.path.join(results_folder, "results.csv")
+flows_filename = os.path.join(results_folder, "flows.csv")
+curtailment_filename = os.path.join(results_folder, "curtailment.csv")
 
 ### Read Network Structure ###
 network_structure_df = pd.read_csv(network_structure_filename)
@@ -102,13 +113,14 @@ for counter1 in range(len(scenario_folders_list)):
         
     flows_df = Results.export_collab_flows(my_network, location_parameters_df)
     
+    curtailment = Results.calculate_curtailment_aut(my_network)
 
 # Save total_data for all scenarios into a single csv file
 total_df.to_csv(results_filename, index=False, header=True)
 total_df_1.to_csv(rounded_results_filename, index=False, header=True)
 # Save flows into a separate file
 flows_df.to_csv(flows_filename, index=False, header=True)
-
+curtailment.to_csv(curtailment_filename, index=False, header=True)
 end_time = time.time()
 print("Time taken to build, update and solve:", end_time - start_time, "s")
 
