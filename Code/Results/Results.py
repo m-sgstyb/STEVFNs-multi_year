@@ -514,15 +514,11 @@ def calculate_curtailment_aut(my_network):
             total_outflows += BESS_charging
             total_storage_discharge += BESS_discharging
 
-        elif name == 'EL_Transport':
-            HVDC_out = asset.flows.value[:timesteps]
-            total_outflows += HVDC_out
-
     # Calculate curtailment as the excess generation at each hour
     curtailment = (total_generation + total_storage_discharge) - (total_demand + total_outflows)
     curtailment[curtailment < 0] = 0  # Ensure curtailment is non-negative
 
-    # Determine curtailment contributions from PV and Wind
+    # Determine curtailment contributions from PV and Wind, assuming PV is curtailed first
     pv_curtailment = np.minimum(curtailment, pv_generation)
     wind_curtailment = np.minimum(curtailment - pv_curtailment, wind_generation)
 
@@ -534,5 +530,80 @@ def calculate_curtailment_aut(my_network):
     })
 
     return curtailment_df
+
+def calculate_curtailment_collab(my_network):
+    '''
+    Parameters
+    ----------
+    my_network : STEVFNs network
+        Full network after running a given system in collaboration
+
+    Returns
+    -------
+    DataFrame
+        Dataframe of curtailment data, hourly
+    '''
+    # Extract timesteps in network structure
+    timesteps = my_network.system_structure_properties["simulated_timesteps"]
+
+    total_generation = np.zeros(timesteps)
+    total_demand = np.zeros(timesteps)
+    total_outflows = np.zeros(timesteps)
+    total_storage_discharge = np.zeros(timesteps)
+    pv_generation = np.zeros(timesteps)
+    wind_generation = np.zeros(timesteps)
+    hvdc_in = np.zeros(timesteps)
+    hvdc_out = np.zeros(timesteps)
+
+    for i in range(1, len(my_network.assets)):
+        asset = my_network.assets[i]
+        name = asset.asset_name
+
+        if name in ['RE_PV_Exiting', 'RE_PV_Openfield_Lim']:
+            pv_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
+            pv_generation += pv_data
+            total_generation += pv_data
+
+        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
+            wind_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
+            wind_generation += wind_data
+            total_generation += wind_data
+
+        elif name in ['PP_CO2', 'PP_CO2_Existing']:
+            generation_data = asset.flows.value
+            total_generation += generation_data
+
+        elif name == 'EL_Demand_UM' or name == 'EL_Demand':
+            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value if name == 'EL_Demand_UM' else asset.flows.value
+            total_demand += demand_data
+
+        elif name == 'BESS':
+            BESS_charging = asset.assets_dictionary['Charging'].flows.value
+            BESS_discharging = asset.assets_dictionary['Discharging'].flows.value
+            total_outflows += BESS_charging
+            total_storage_discharge += BESS_discharging
+
+        elif name == 'EL_Transport':
+            HVDC_out = asset.flows.value[:timesteps]
+            total_outflows += HVDC_out
+
+    
+    # Calculate curtailment as the excess generation at each hour
+    curtailment = (total_generation + total_storage_discharge) - (total_demand + total_outflows)
+    curtailment[curtailment < 0] = 0  # Ensure curtailment is non-negative
+
+    # Determine curtailment contributions from PV and Wind, assuming PV is curtailed first
+    pv_curtailment = np.minimum(curtailment, pv_generation)
+    wind_curtailment = np.minimum(curtailment - pv_curtailment, wind_generation)
+
+    # Create a DataFrame for curtailment
+    curtailment_df = pd.DataFrame({
+        "Total_Curtailment": curtailment,
+        "PV_Curtailment": pv_curtailment,
+        "Wind_Curtailment": wind_curtailment
+    })
+
+    return curtailment_df
+
 
 

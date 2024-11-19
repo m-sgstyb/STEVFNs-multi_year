@@ -22,7 +22,9 @@ from Code.Plotting import mitigation_plots
 from Code.Results import Results
 
 #### Define Input Files ####
-case_study_name = "MX"
+# case_study_name = "MEX"
+# case_study_name = "CHL"
+case_study_name = "USA_WECC"
 
 base_folder = os.path.dirname(__file__)
 data_folder = os.path.join(base_folder, "Data")
@@ -83,8 +85,8 @@ for counter1 in range(len(scenario_folders_list)):
     
     ### Run Simulation ###
     solve_time = time.time()
-    my_network.problem.solve(solver = cp.MOSEK)
-    # my_network.solve_problem() # Default solver is CLARABEL with max_iter=10000
+    # my_network.problem.solve(solver = cp.MOSEK)
+    my_network.solve_problem() # Default solver is CLARABEL with max_iter=10000
     solved_time = time.time()
 
     # Print some results
@@ -94,6 +96,7 @@ for counter1 in range(len(scenario_folders_list)):
     
     # Avoid breaking the optimisation if a scenario does not converge
     if my_network.problem.value == float("inf"):
+        print("problem value inf")
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
@@ -111,7 +114,7 @@ for counter1 in range(len(scenario_folders_list)):
         total_df = pd.concat([total_df, t_df], ignore_index=True)
         total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
         
-    flows_df = Results.export_collab_flows(my_network, location_parameters_df)
+    # flows_df = Results.export_collab_flows()(my_network, location_parameters_df)
     
     curtailment = Results.calculate_curtailment_aut(my_network)
 
@@ -119,38 +122,38 @@ for counter1 in range(len(scenario_folders_list)):
 total_df.to_csv(results_filename, index=False, header=True)
 total_df_1.to_csv(rounded_results_filename, index=False, header=True)
 # Save flows into a separate file
-flows_df.to_csv(flows_filename, index=False, header=True)
+# flows_df.to_csv(flows_filename, index=False, header=True)
 curtailment.to_csv(curtailment_filename, index=False, header=True)
 end_time = time.time()
 print("Time taken to build, update and solve:", end_time - start_time, "s")
 
 #%% Plotting
 ## Manual plotting 
-categories = []
-values = []
+# categories = []
+# values = []
 
-# # Iterate through assets, starting from i = 1 to skip i = 0
-for i in range(1, len(my_network.assets)):  
-    category = my_network.assets[i].asset_name
-    value = my_network.assets[i].asset_size()
+# # # Iterate through assets, starting from i = 1 to skip i = 0
+# for i in range(1, len(my_network.assets)):  
+#     category = my_network.assets[i].asset_name
+#     value = my_network.assets[i].asset_size()
     
-    # Only add the category and value if the value is >= 1e-6
-    if value >= 1e-3:
-        categories.append(category)
-        values.append(value)
+#     # Only add the category and value if the value is >= 1e-6
+#     if value >= 1e-3:
+#         categories.append(category)
+#         values.append(value)
 
-# Normalize colors to the number of bars
-num_bars = len(values)
-colors = plt.cm.viridis(np.linspace(0, 1, num_bars))  # Change 'viridis' to any preferred colormap
+# # Normalize colors to the number of bars
+# num_bars = len(values)
+# colors = plt.cm.viridis(np.linspace(0, 1, num_bars))  # Change 'viridis' to any preferred colormap
 
-# Plot all bars together after the loop ends, applying the color map
-plt.figure(figsize=(12, 8))
-plt.bar(categories, values, color=colors)
-plt.title("Asset Sizes")
-plt.xlabel("Asset Name")
-plt.ylabel("Asset Size")
+# # Plot all bars together after the loop ends, applying the color map
+# plt.figure(figsize=(12, 8))
+# plt.bar(categories, values, color=colors)
+# plt.title("Asset Sizes")
+# plt.xlabel("Asset Name")
+# plt.ylabel("Asset Size")
 
-# Show the combined plot
-plt.xticks(rotation=45)  # Rotate x-axis labels if needed for better readability
-plt.tight_layout()       # Adjust layout to fit x-axis labels
-plt.show()
+# # Show the combined plot
+# plt.xticks(rotation=45)  # Rotate x-axis labels if needed for better readability
+# plt.tight_layout()       # Adjust layout to fit x-axis labels
+# plt.show()
