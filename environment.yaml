@@ -1,0 +1,14 @@
+name: dphil-clean
+channels:
+  - conda-forge
+  - mosek
+
+dependencies:
+- numpy
+- pandas
+- cvxpy
+- mosek
+- python=3.10.12
+- spyder
+- matplotlib
+
