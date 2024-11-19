@@ -531,79 +531,108 @@ def calculate_curtailment_aut(my_network):
 
     return curtailment_df
 
-def calculate_curtailment_collab(my_network):
+def calculate_curtailment_collab(my_network, location_parameters_df):
     '''
     Parameters
     ----------
     my_network : STEVFNs network
-        Full network after running a given system in collaboration
+        Full network after running a given system in collaboration.
+    location_parameters_df : DataFrame
+        A DataFrame with location parameters, indexed by location IDs.
 
     Returns
     -------
     DataFrame
-        Dataframe of curtailment data, hourly
+        Dataframe of curtailment data by location, hourly.
     '''
     # Extract timesteps in network structure
     timesteps = my_network.system_structure_properties["simulated_timesteps"]
-
-    total_generation = np.zeros(timesteps)
-    total_demand = np.zeros(timesteps)
-    total_outflows = np.zeros(timesteps)
-    total_storage_discharge = np.zeros(timesteps)
-    pv_generation = np.zeros(timesteps)
-    wind_generation = np.zeros(timesteps)
-    hvdc_in = np.zeros(timesteps)
-    hvdc_out = np.zeros(timesteps)
-
+    
+    # Initialize dictionaries to store results for each location
+    curtailment_data = {}
+    
+    # Process assets by location
     for i in range(1, len(my_network.assets)):
         asset = my_network.assets[i]
         name = asset.asset_name
 
+        # Determine the location of the asset
+        loc1 = asset.node_location if 'node_location' in dir(asset) \
+            else asset.asset_structure.get("Location_1")
+        if loc1 not in location_parameters_df.index:
+            continue  # Skip if the location is not in the location parameters DataFrame
+
+        loc_name = location_parameters_df.loc[loc1, "location_name"]
+
+        # Initialize location-specific data structure if not already present
+        if loc_name not in curtailment_data:
+            curtailment_data[loc_name] = {
+                "Total_Generation": np.zeros(timesteps),
+                "Total_Demand": np.zeros(timesteps),
+                "Total_Outflows": np.zeros(timesteps),
+                "Total_Storage_Discharge": np.zeros(timesteps),
+                "PV_Generation": np.zeros(timesteps),
+                "Wind_Generation": np.zeros(timesteps),
+                "HVDC_In": np.zeros(timesteps),
+            }
+
+        # Fetch generation or consumption data
         if name in ['RE_PV_Exiting', 'RE_PV_Openfield_Lim']:
             pv_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            pv_generation += pv_data
-            total_generation += pv_data
+            curtailment_data[loc_name]["PV_Generation"] += pv_data
+            curtailment_data[loc_name]["Total_Generation"] += pv_data
 
         elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
             wind_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            wind_generation += wind_data
-            total_generation += wind_data
+            curtailment_data[loc_name]["Wind_Generation"] += wind_data
+            curtailment_data[loc_name]["Total_Generation"] += wind_data
 
         elif name in ['PP_CO2', 'PP_CO2_Existing']:
             generation_data = asset.flows.value
-            total_generation += generation_data
+            curtailment_data[loc_name]["Total_Generation"] += generation_data
 
         elif name == 'EL_Demand_UM' or name == 'EL_Demand':
             demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value if name == 'EL_Demand_UM' else asset.flows.value
-            total_demand += demand_data
+            curtailment_data[loc_name]["Total_Demand"] += demand_data
 
         elif name == 'BESS':
             BESS_charging = asset.assets_dictionary['Charging'].flows.value
             BESS_discharging = asset.assets_dictionary['Discharging'].flows.value
-            total_outflows += BESS_charging
-            total_storage_discharge += BESS_discharging
+            curtailment_data[loc_name]["Total_Outflows"] += BESS_charging
+            curtailment_data[loc_name]["Total_Storage_Discharge"] += BESS_discharging
 
         elif name == 'EL_Transport':
             HVDC_out = asset.flows.value[:timesteps]
-            total_outflows += HVDC_out
+            HVDC_in = asset.flows.value[timesteps:timesteps*2]
+            curtailment_data[loc_name]["Total_Outflows"] += HVDC_out
+            curtailment_data[loc_name]["HVDC_In"] += HVDC_in
 
-    
-    # Calculate curtailment as the excess generation at each hour
-    curtailment = (total_generation + total_storage_discharge) - (total_demand + total_outflows)
-    curtailment[curtailment < 0] = 0  # Ensure curtailment is non-negative
+    # Calculate curtailment for each location
+    results = []
+    for loc_name, data in curtailment_data.items():
+        # Calculate curtailment as excess generation
+        curtailment = (data["Total_Generation"] + data["Total_Storage_Discharge"] + data["HVDC_In"]) - \
+                      (data["Total_Demand"] + data["Total_Outflows"])
+        curtailment[curtailment < 0] = 0  # Ensure non-negative curtailment
 
-    # Determine curtailment contributions from PV and Wind, assuming PV is curtailed first
-    pv_curtailment = np.minimum(curtailment, pv_generation)
-    wind_curtailment = np.minimum(curtailment - pv_curtailment, wind_generation)
+        # Determine curtailment contributions from PV and Wind
+        pv_curtailment = np.minimum(curtailment, data["PV_Generation"])
+        wind_curtailment = np.minimum(curtailment - pv_curtailment, data["Wind_Generation"])
 
-    # Create a DataFrame for curtailment
-    curtailment_df = pd.DataFrame({
-        "Total_Curtailment": curtailment,
-        "PV_Curtailment": pv_curtailment,
-        "Wind_Curtailment": wind_curtailment
-    })
+        # Store results in a structured format
+        results.append(pd.DataFrame({
+            "Location": loc_name,
+            "Hour": np.arange(timesteps),
+            "Total_Curtailment": curtailment,
+            "PV_Curtailment": pv_curtailment,
+            "Wind_Curtailment": wind_curtailment
+        }))
+
+    # Combine results into a single DataFrame
+    curtailment_df = pd.concat(results, ignore_index=True)
 
     return curtailment_df
+
 
 
 
