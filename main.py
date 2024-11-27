@@ -21,8 +21,8 @@ from Code.Plotting import mitigation_plots
 from Code.Results import Results
 
 #### Define Input Files ####
-case_study_name = "MEX"
-# case_study_name = "CHL"
+# case_study_name = "MEX"
+case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 
 # case_study_name = "MEX-CHL_Autarky"
@@ -106,35 +106,35 @@ for counter1 in range(len(scenario_folders_list)):
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
     DPhil_Plotting.plot_asset_sizes(my_network)
-    
+    DPhil_Plotting.plot_asset_sizes_stacked(my_network, location_parameters_df)
     # Save results for asset flows and total data per scenario
-    t_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
-    t1_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
-    if counter1 == 0:
-        total_df = t_df
-        total_df_1 = t1_df
-    else:
-        # Concatenate next scenario's results into one dataframe
-        total_df = pd.concat([total_df, t_df], ignore_index=True)
-        total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
+#     t_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
+#     t1_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
+#     if counter1 == 0:
+#         total_df = t_df
+#         total_df_1 = t1_df
+#     else:
+#         # Concatenate next scenario's results into one dataframe
+#         total_df = pd.concat([total_df, t_df], ignore_index=True)
+#         total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
     
-    # flows_df = Results.export_aut_flows(my_network)
-    flows_df = Results.export_collab_flows(my_network, location_parameters_df)
+#     # flows_df = Results.export_aut_flows(my_network)
+#     flows_df = Results.export_collab_flows(my_network, location_parameters_df)
     
-#     # curtailment = Results.calculate_curtailment_aut(my_network)
-    curtailment = Results.calculate_curtailment_collab(my_network, location_parameters_df)
+# #     # curtailment = Results.calculate_curtailment_aut(my_network)
+#     curtailment = Results.calculate_curtailment_collab(my_network, location_parameters_df)
     
-    flows_filename = os.path.join(results_folder, f"flows{my_network.scenario_name}.csv")
-    curtailment_filename = os.path.join(results_folder, f"curtailment{my_network.scenario_name}.csv")
-    curtailment.to_csv(curtailment_filename, index=False, header=True)
-    flows_df.to_csv(flows_filename, index=False, header=True)
+#     flows_filename = os.path.join(results_folder, f"flows{my_network.scenario_name}.csv")
+#     curtailment_filename = os.path.join(results_folder, f"curtailment{my_network.scenario_name}.csv")
+#     curtailment.to_csv(curtailment_filename, index=False, header=True)
+#     flows_df.to_csv(flows_filename, index=False, header=True)
 
-# # Save total_data for all scenarios into a single csv file
-total_df.to_csv(results_filename, index=False, header=True)
-total_df_1.to_csv(rounded_results_filename, index=False, header=True)
-# Save flows into a separate file
-end_time = time.time()
-print("Time taken to build, update and solve:", end_time - start_time, "s")
+# # # Save total_data for all scenarios into a single csv file
+# total_df.to_csv(results_filename, index=False, header=True)
+# total_df_1.to_csv(rounded_results_filename, index=False, header=True)
+# # Save flows into a separate file
+# end_time = time.time()
+# print("Time taken to build, update and solve:", end_time - start_time, "s")
 
 #%% Plotting
 
