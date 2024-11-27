@@ -1,4 +1,4 @@
 Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,maximum_size,maximum_size_unit,location_name
-0,0.8,G$/GWp,262800,h,PVOUT,24,0,2587.942383,GWp,MX
-1,0.616533612,G$/GWp,262800,h,PVOUT,24,0,2586.60607,GWp,US
-2,0.616533612,G$/GWp,262800,h,PVOUT,24,0,1793.435667,GWp,CL
+0,1.05,G$/GWp,262800,h,PVOUT,24,0,9.91345,GWp,MX
+1,1.109,G$/GWp,262800,h,PVOUT,24,0,2586.60607,GWp,US
+2,0.954,G$/GWp,262800,h,PVOUT,24,0,1793.435667,GWp,CL

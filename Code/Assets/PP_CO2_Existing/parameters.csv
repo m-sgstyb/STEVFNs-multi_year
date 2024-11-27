@@ -1,4 +1,4 @@
 Type,sizing_constant,sizing_constant_unit,usage_constant_1,usage_constant_1_unit,usage_constant_2,usage_constant_2_unit,lifespan,lifespan_units,CO2_emissions_factor,CO2_emissions_factor_unit,existing_capacity,existing_capacity_units,location_name
-0,0,G$/GWp,8.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000405,MtCO2e/GWh,52.65,GWp,MX
+0,0,G$/GWp,8.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.00040597,MtCO2e/GWh,36.56871,GWp,MX
 1,0,G$/GWp,8.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000405,MtCO2e/GWh,103.7669,GWp,US
 2,0,G$/GWp,8.38E-05,G$/GWh,0,G$/(GWh^2),219000,h,0.000405,MtCO2e/GWh,10.2,GWp,CL

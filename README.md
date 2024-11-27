@@ -1,5 +1,5 @@
 # STEVFNs-DPhil-MSB
-This repository contains an application of the [STEVFNs](https://github.com/OmNomNomzzz/STEVFNs) model, adapted for the case study in my doctoral thesis.
+This repository contains an application of the Space-Time Energy Vector Flow Networks [(STEVFNs)](https://github.com/OmNomNomzzz/STEVFNs) model, adapted for the case study in my doctoral thesis.
 As an application of the original software, this code is licensed under an MIT license (please see LICENSE and Citations.bib files for details).
 Please also see the NOTICE file to find the license for dependent software used in this model.
 ## Case Study

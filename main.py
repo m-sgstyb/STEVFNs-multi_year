@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Nov  4 17:38:43 2021
-
 @author: aniqahsan
 
-Adapted from Tue Nov 5 2024 by:
-Mónica Sagastuy-Breña
+Last Adapted on 19 Nov 2024
+@author: Mónica Sagastuy-Breña
 """
 
 import pandas as pd
@@ -22,9 +21,15 @@ from Code.Plotting import mitigation_plots
 from Code.Results import Results
 
 #### Define Input Files ####
-# case_study_name = "MEX"
+case_study_name = "MEX"
 # case_study_name = "CHL"
-case_study_name = "USA_WECC"
+# case_study_name = "USA_WECC"
+
+# case_study_name = "MEX-CHL_Autarky"
+# case_study_name = "MEX-CHL_Collab"
+
+# case_study_name = "USA_WECC-CHL_Autarky"
+# case_study_name = "USA_WECC-CHL_Collab"
 
 base_folder = os.path.dirname(__file__)
 data_folder = os.path.join(base_folder, "Data")
@@ -36,7 +41,7 @@ if not os.path.exists(results_folder):
 scenario_folders_list = []
 for folder in os.listdir(case_study_folder):
     full_path = os.path.join(case_study_folder, folder)
-    # Check if the item is a folder and starts with 'scenario_'
+    # Check if the item is a folder and starts with 'scenario_' to add to scenario_folders_list
     if os.path.isdir(full_path) and folder.startswith('scenario_'):
         scenario_folders_list.append(full_path)
     
@@ -45,8 +50,8 @@ network_structure_filename = os.path.join(case_study_folder, "Network_Structure.
 #### Define Output Files ####
 rounded_results_filename = os.path.join(results_folder, "results_rounded.csv")
 results_filename = os.path.join(results_folder, "results.csv")
-flows_filename = os.path.join(results_folder, "flows.csv")
-curtailment_filename = os.path.join(results_folder, "curtailment.csv")
+# flows_filename = os.path.join(results_folder, "flows.csv")
+# curtailment_filename = os.path.join(results_folder, "curtailment.csv")
 
 ### Read Network Structure ###
 network_structure_df = pd.read_csv(network_structure_filename)
@@ -85,8 +90,8 @@ for counter1 in range(len(scenario_folders_list)):
     
     ### Run Simulation ###
     solve_time = time.time()
-    # my_network.problem.solve(solver = cp.MOSEK)
-    my_network.solve_problem() # Default solver is CLARABEL with max_iter=10000
+    my_network.problem.solve(solver = cp.MOSEK, verbose=True)
+    # my_network.solve_problem() # Default solver is CLARABEL with max_iter=10000
     solved_time = time.time()
 
     # Print some results
@@ -103,7 +108,6 @@ for counter1 in range(len(scenario_folders_list)):
     DPhil_Plotting.plot_asset_sizes(my_network)
     
     # Save results for asset flows and total data per scenario
-    Results.export_aut_flows(my_network).to_csv(flows_filename)
     t_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
     t1_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
     if counter1 == 0:
@@ -113,21 +117,34 @@ for counter1 in range(len(scenario_folders_list)):
         # Concatenate next scenario's results into one dataframe
         total_df = pd.concat([total_df, t_df], ignore_index=True)
         total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
-        
-    # flows_df = Results.export_collab_flows()(my_network, location_parameters_df)
     
-    curtailment = Results.calculate_curtailment_aut(my_network)
+    # flows_df = Results.export_aut_flows(my_network)
+    flows_df = Results.export_collab_flows(my_network, location_parameters_df)
+    
+#     # curtailment = Results.calculate_curtailment_aut(my_network)
+    curtailment = Results.calculate_curtailment_collab(my_network, location_parameters_df)
+    
+    flows_filename = os.path.join(results_folder, f"flows{my_network.scenario_name}.csv")
+    curtailment_filename = os.path.join(results_folder, f"curtailment{my_network.scenario_name}.csv")
+    curtailment.to_csv(curtailment_filename, index=False, header=True)
+    flows_df.to_csv(flows_filename, index=False, header=True)
 
-# Save total_data for all scenarios into a single csv file
+# # Save total_data for all scenarios into a single csv file
 total_df.to_csv(results_filename, index=False, header=True)
 total_df_1.to_csv(rounded_results_filename, index=False, header=True)
 # Save flows into a separate file
-# flows_df.to_csv(flows_filename, index=False, header=True)
-curtailment.to_csv(curtailment_filename, index=False, header=True)
 end_time = time.time()
 print("Time taken to build, update and solve:", end_time - start_time, "s")
 
 #%% Plotting
+
+# plot_filename = os.path.join(results_folder, "emissions-reduction.png")
+# total_data_filename = os.path.join(data_folder, "Case_Study", "USA_WECC-CHL_Autarky", "Results", "results.csv")
+# countries=["US", "CL"]
+# mitigation_plots.dpacc_subplots(total_data_filename, total_data_filename, plot_filename,
+#                 "USA_WECC-CHL_Autarky", countries)
+
+
 ## Manual plotting 
 # categories = []
 # values = []

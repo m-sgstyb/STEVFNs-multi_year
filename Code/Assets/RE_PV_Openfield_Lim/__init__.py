@@ -36,7 +36,10 @@ class RE_PV_Openfield_Lim_Asset(Asset_STEVFNs):
         self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
         return
-        
+    
+    def define_params(self, params):
+        self.params = params
+        return
     
     def define_structure(self, asset_structure):
         self.asset_structure = asset_structure

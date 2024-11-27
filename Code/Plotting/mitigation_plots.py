@@ -139,10 +139,10 @@ def dpacc_subplots(total_data_filename, capacities_data_filename, plot_filename,
                name = ""
        
         if not rows.empty:
-            rows = rows.sort_values(by=["collaboration_emissions"])
-            rows = rows.set_index("collaboration_emissions")
+            rows = rows.sort_values(by=["collaboration_emissions_MtCO2e/y"])
+            rows = rows.set_index("collaboration_emissions_MtCO2e/y")
             col_name = rows["technology_name"].iloc[0]
-            df[col_name] = rows["technology_cost"]
+            df[col_name] = rows["technology_cost_G$/y"]
             df.index = rows.index
        
         total_data.drop(index=total_data.index[:counter], axis=0, inplace=True)
@@ -177,10 +177,10 @@ def dpacc_subplots(total_data_filename, capacities_data_filename, plot_filename,
                 name = ""
         
         if not cap_rows.empty:
-            cap_rows = cap_rows.sort_values(by=["collaboration_emissions"])
-            cap_rows = cap_rows.set_index("collaboration_emissions")
+            cap_rows = cap_rows.sort_values(by=["collaboration_emissions_MtCO2e/y"])
+            cap_rows = cap_rows.set_index("collaboration_emissions_MtCO2e/y")
             col_name = cap_rows["technology_name"].iloc[0]
-            cap_df[col_name] = cap_rows["technology_capacity"]
+            cap_df[col_name] = cap_rows["technology_size"]
             cap_df.index = cap_rows.index
         
         cap_data.drop(index=cap_data.index[:counter], axis=0, inplace=True)
