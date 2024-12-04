@@ -1,8 +1,5 @@
 Type,maximum_budget,maximum_budget_unit,case_study
-0,1.00E+06,MtCO2e,No_limit
-1,6.00E+03,MtCO2e,High
-2,2.50E+03,MtCO2e,med
-3,1.79E+03,MtCO2e,MEX / year 2023
-4,1.19E+03,MtCO2e,MEX/year 2030
-5,5.98E+02,MtCO2e,MEX/year 2040
-6,0.00E+00,MtCO2e,MEX/year 2050
+0,0.00E+00,MtCO2e,Net-zero
+1,1.00E+06,MtCO2e,No-limit
+2,797.7772128,MtCO2e,MEX_2030
+3,398.8886064,MtCO2e,MEX_2040

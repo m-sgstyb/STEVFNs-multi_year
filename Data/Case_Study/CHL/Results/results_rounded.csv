@@ -1,9 +1,9 @@
 country_1,country_2,country_3,country_4,collaboration_emissions,technology_cost,technology_size,technology_name,collaboration_emissions_MtCO2e/y,technology_cost_G$/y
-CL,,,,,,8.366,RE_PV_Existing_[CL],1.6,0.0
-CL,,,,,,4.51,RE_WIND_Existing_[CL],1.6,0.0
-CL,,,,,,2.4655069703676627e-06,RE_PV_Openfield_Lim_[CL],1.6,0.0
-CL,,,,,,18.45912482086063,RE_WIND_Onshore_Lim_[CL],1.6,0.5
-CL,,,,,,0.008483774183590937,BESS_[CL],1.6,0.0
-CL,,,,,,0.00026991600398674863,PP_CO2_[CL],1.6,0.0
-CL,,,,,,7.345104932715951,PP_CO2_Existing_[CL],1.6,0.2
-CL,,,,,,10.7,EL_Demand_[CL],1.6,0.0
+CL,,,,,,127.8948529,RE_PV_Existing_[CL],0.0,0.0
+CL,,,,,,6.995018561,RE_WIND_Existing_[CL],0.0,0.0
+CL,,,,,,0.9999970166647062,RE_PV_Openfield_Lim_[CL],0.0,0.0
+CL,,,,,,30.999999984753536,RE_WIND_Onshore_Lim_[CL],0.0,0.8
+CL,,,,,,23.80176434641421,BESS_[CL],0.0,0.4
+CL,,,,,,0.0,PP_CO2_[CL],0.0,0.0
+CL,,,,,,0.0,PP_CO2_Existing_[CL],0.0,0.0
+CL,,,,,,10.7,EL_Demand_[CL],0.0,0.0

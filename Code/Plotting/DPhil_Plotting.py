@@ -131,7 +131,7 @@ def plot_asset_sizes(my_network, bar_width = 1.0, bar_spacing = 3.0):
     my_artist.plot(bar_width = bar_width, bar_spacing = bar_spacing)
     return
 
-def plot_asset_sizes_stacked(my_network, location_parameters_df):
+def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None):
     og_df = my_network.system_structure_df.copy()
     asset_sizes_array = np.array([my_network.assets[counter].asset_size() for counter in range(len(og_df))])
     og_df["Asset_Size"] = asset_sizes_array
@@ -175,30 +175,34 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df):
         existing_fossil = float(og_df.query("Asset_Class == 'PP_CO2_Existing'")['Asset_Size'].iloc[0])
         bars.append(plt.bar("Fossil Gen.", existing_fossil, color=pp_colors[0], label="Fossil Existing"))
         
-    if "BESS_Existing" in asset_class_list:
-        existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing"))
+    if "BESS" in asset_class_list:
+        new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
+        bars.append(plt.bar("Total BESS", new_bess, color=bess_colors[1], label="BESS New"))
         
-        if "BESS" in asset_class_list:
-            new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total BESS", new_bess, bottom=existing_bess, color=bess_colors[1], label="BESS New"))
+        if "BESS_Existing" in asset_class_list:
+            existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
+            bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing"))
     
     if "EL_Transport" in asset_class_list:
         hvdc_cable = float(og_df.query("Asset_Class == 'EL_Transport'")['Asset_Size'].iloc[0])
         bars.append(plt.bar("EL_Transport", hvdc_cable, color=hvdc_color, label="HVDC Cable"))
-        
+    
+    
     plt.xlabel(loc_name)
     plt.ylabel("Asset Size (GWp)")
-    plt.title("Asset Sizes")
+    plt.title("Asset Sizes " + my_network.scenario_name)
 
     # Use only unique labels in the legend to avoid duplicates
     handles, labels = plt.gca().get_legend_handles_labels()
     unique_labels = dict(zip(labels, handles))
     plt.legend(unique_labels.values(), unique_labels.keys())
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
 
     plt.show()
-
-    return
+    
+    return 
 
 
 def plot_asset_costs(my_network, bar_width = 1.0, bar_spacing = 3.0):
