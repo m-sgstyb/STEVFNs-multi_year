@@ -1,4 +1,8 @@
-Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,maximum_size,maximum_size_unit,country
-0,0.8,G$/GWp,262800,h,WINDOUT,24,0,81.4791,GWp,MX
-1,1.446743332,G$/GWp,262800,h,WINDOUT,24,0,665.9556,GWp,US
-2,0.79,G$/GWp,262800,h,WINDOUT,24,0,1019,GWp,CL
+Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,maximum_size,maximum_size_unit,minimum_size,minimum_size_unit,country,description
+0,0.8,G$/GWp,262800,h,WINDOUT,24,0,13700.87,GWp,0,GWp,MEX,tech_limit
+1,0.8,G$/GWp,262800,h,WINDOUT,24,0,3.74,GWp,0,GWp,MEX,one_year_max_rate
+2,0.8,G$/GWp,262800,h,WINDOUT,24,0,37.4,GWp,0,GWp,MEX,ten_year_max_rate
+3,0.8,G$/GWp,262800,h,WINDOUT,24,0,37.4,GWp,0,GWp,MEX,ten_year_max_rate
+4,0.8,G$/GWp,262800,h,WINDOUT,24,0,37.4,GWp,0,GWp,MEX,ten_year_max_rate
+5,1.446743332,G$/GWp,262800,h,WINDOUT,24,0,43.9484,GWp,10.54,GWp,USA,
+6,0.79,G$/GWp,262800,h,WINDOUT,24,0,31,GWp,30,GWp,CHL,

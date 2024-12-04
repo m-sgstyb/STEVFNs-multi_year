@@ -25,7 +25,7 @@ class RE_WIND_Onshore_Lim_Asset(Asset_STEVFNs):
     
     @staticmethod
     def cost_fun(flows, params):
-        return params["sizing_constant"] * flows
+        return params["sizing_constant"] * cp.maximum(flows, params["minimum_size"])
     
     @staticmethod
     def conversion_fun_2(flows, params):
@@ -33,7 +33,8 @@ class RE_WIND_Onshore_Lim_Asset(Asset_STEVFNs):
     
     def __init__(self):
         super().__init__()
-        self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
+        self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True),
+                                "minimum_size": cp.Parameter(nonneg=True)}
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
         return
         
