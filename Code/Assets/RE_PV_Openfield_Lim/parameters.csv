@@ -2,7 +2,7 @@ Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_siz
 0,1.05,G$/GWp,262800,h,PVOUT,24,0,2587.942,GWp,30,GWp,MEX,tech_limit
 1,1.05,G$/GWp,262800,h,PVOUT,24,0,13.06,GWp,30,GWp,MEX,one_year_max_rate
 2,1.05,G$/GWp,262800,h,PVOUT,24,0,130.6,GWp,30,GWp,MEX,ten_year_max_rate
-3,1.05,G$/GWp,262800,h,PVOUT,24,0,110.2871293,GWp,30,GWp,MEX,carrying capacity - existing
-4,1.05,G$/GWp,262800,h,PVOUT,24,0,48.77514714,GWp,30,GWp,MEX,carrying capacity - existing
+3,1.05,G$/GWp,262800,h,PVOUT,24,0,109.4709785,GWp,54.73548924,GWp,MEX,carrying capacity - existing
+4,1.05,G$/GWp,262800,h,PVOUT,24,0,54.73548925,GWp,54.73548925,GWp,MEX,carrying capacity - existing
 5,1.109,G$/GWp,262800,h,PVOUT,24,0,87.4566,GWp,26.911,GWp,USA_WECC,
 6,0.954,G$/GWp,262800,h,PVOUT,24,0,2,GWp,1,GWp,CHL,

@@ -21,8 +21,8 @@ from Code.Plotting import mitigation_plots
 from Code.Results import Results
 
 #### Define Input Files ####
-# case_study_name = "MEX"
-case_study_name = "CHL"
+case_study_name = "MEX"
+# case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 
 # case_study_name = "MEX-CHL_Autarky"
