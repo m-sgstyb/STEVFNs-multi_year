@@ -19,15 +19,17 @@ class Charging_Asset(Asset_STEVFNs):
     source_node_type = "EL"
     target_node_type = "BESS"
     source_node_type_2 = "NULL"
-    target_node_type_2 = "BESS"
+    target_node_type_2 = "BESS_Existing"
     target_node_time_2 = 0
     
     @staticmethod
     def cost_fun(flows, params):
         sizing_constant = params["charging_sizing_constant"]
         usage_constant_1 = params["charging_usage_constant"]
+        
         return cp.maximum(sizing_constant * cp.max(flows),  usage_constant_1 * cp.sum(flows))
         
+    
     @staticmethod
     def conversion_fun(flows, params):
         conversion_factor = params["charging_conversion_factor"]
@@ -36,8 +38,7 @@ class Charging_Asset(Asset_STEVFNs):
     # To limit asset size to a set maximum parameter
     @staticmethod
     def conversion_fun_2(flows, params):
-        maximum_size = params["maximum_size"]
-        return maximum_size - flows 
+        return params["maximum_size"] - flows
     
     def __init__(self):
         super().__init__()
@@ -104,7 +105,6 @@ class Charging_Asset(Asset_STEVFNs):
     
     def _update_parameters(self):
         super()._update_parameters()
-        # Update parameters in second conversion function to set maximum asset size
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.parameters_df[parameter_name]
         #Set Usage Parameters Based on NPV#
@@ -118,13 +118,13 @@ class Discharging_Asset(Asset_STEVFNs):
     source_node_type = "BESS"
     target_node_type = "EL"
     source_node_type_2 = "NULL"
-    target_node_type_2 = "BESS"
+    target_node_type_2 = "BESS_Existing"
     target_node_time_2 = 0
-    
     @staticmethod
     def cost_fun(flows, params):
         sizing_constant = params["discharging_sizing_constant"]
         usage_constant_1 = params["discharging_usage_constant"]
+        
         return cp.maximum(sizing_constant * cp.max(flows),  usage_constant_1 * cp.sum(flows))
     
     @staticmethod
@@ -204,7 +204,6 @@ class Discharging_Asset(Asset_STEVFNs):
     
     def _update_parameters(self):
         super()._update_parameters()
-        # Update parameters in second conversion function to set maximum asset size
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.parameters_df[parameter_name]
         #Set Usage Parameters Based on NPV#
@@ -277,9 +276,9 @@ class Storage_Asset(Asset_STEVFNs):
         self._update_sizing_constant()
         return
 
-class BESS_Asset(Multi_Asset):
-    """Class for Battery Energy Storage System"""
-    asset_name = "BESS"
+class BESS_Existing_Asset(Multi_Asset):
+    """Class for Battery Energy Storage System when there is existing capacity"""
+    asset_name = "BESS_Existing"
     assets_class_dictionary = {"Charging": Charging_Asset,
                                "Discharging": Discharging_Asset,
                                "Storage": Storage_Asset}
