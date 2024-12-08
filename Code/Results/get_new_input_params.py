@@ -8,8 +8,10 @@ Created on Tue Nov 26 20:03:33 2024
 
 import pandas as pd
 import numpy as np
+import os
 
-def update_existing_RE_capacity(my_network, tech_lim, tech_existing):
+def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
+                                assets_folder, iteration_year):
     """
     Calculates the updated existing capacity for a given technology after an iteration.
     Value should be input into Assets/tech_existing/parameters.csv
@@ -22,11 +24,16 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing):
         Asset name for the limited capacity technology (e.g., 'RE_PV_Openfield_Lim').
     tech_existing : str
         Asset name for the existing capacity technology (e.g., 'RE_PV_Existing').
+    asset_folder : path
+        Path to the Assets folder in the Code for STEVFNs
+    iteration_year : str
+        String of the end year being modelled. i.e. if the period 2020-2030 is being modelled,
+        iteration_year would be '2030'
 
     Returns
     -------
-    FLOAT
-        Updated value for installed capacity for the next iteration.
+    CSV FILE
+        Updated paramters.csv file saved in the asset folder for next run
     """
     new_capacity = 0
 
@@ -38,8 +45,22 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing):
     # Update the existing capacity with the new capacity
     for asset in my_network.assets:
         if asset.asset_name == tech_existing:
-            asset.parameters_df['existing_capacity'] += new_capacity
-            return asset.parameters_df['existing_capacity']
+            previous_existing = asset.asset_size()
+            # Need to find path to asset's parameters.csv to update there
+            asset_folder = os.path.join(assets_folder, tech_existing)
+            df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
+            
+            # Find row that has description column value equal to the iteration year
+            # Need to figure out if I can change datatypes when reading the csv. 
+            # Sometimes it reads description column as float and sometimes as string
+            # I want to generalize so that every parameters.csv file can be identified the same
+            id_row = df.index[df['description'] == iteration_year].tolist()
+            # print("ID_ROW", id_row)
+            df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity    
+            
+    return df.to_csv(os.path.join(asset_folder, 'parameters.csv'), index=False)
+        
+# def update_existing_RE_capacity(my_network, )
         
 def update_FF_existing_cap(my_network):
     '''

@@ -19,9 +19,10 @@ from Code.Network.Network import Network_STEVFNs
 from Code.Plotting import DPhil_Plotting
 from Code.Plotting import mitigation_plots
 from Code.Results import Results
+from Code.Results import get_new_input_params
 
 #### Define Input Files ####
-case_study_name = "MEX_test_BESS"
+case_study_name = "MEX"
 # case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 
@@ -32,6 +33,8 @@ case_study_name = "MEX_test_BESS"
 # case_study_name = "USA_WECC-CHL_Collab"
 
 base_folder = os.path.dirname(__file__)
+code_folder = os.path.join(base_folder, "Code")
+assets_folder = os.path.join(code_folder, "Assets")
 data_folder = os.path.join(base_folder, "Data")
 case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
 results_folder = os.path.join(case_study_folder, "Results")
@@ -48,8 +51,8 @@ for folder in os.listdir(case_study_folder):
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
 #### Define Output Files ####
-rounded_results_filename = os.path.join(results_folder, f"results_rounded.csv")
-results_filename = os.path.join(results_folder, f"results.csv")
+rounded_results_filename = os.path.join(results_folder, "results_rounded.csv")
+results_filename = os.path.join(results_folder, "results.csv")
 # flows_filename = os.path.join(results_folder, "flows.csv")
 # curtailment_filename = os.path.join(results_folder, "curtailment.csv")
 
@@ -70,7 +73,10 @@ total_df_1 = pd.DataFrame()
 for counter1 in range(len(scenario_folders_list)):
 # for counter1 in range(1):
     # Read Input Files ###
-    scenario_folder = scenario_folders_list[-1-counter1]
+    scenario_folder = scenario_folders_list[counter1]
+    # Get year value out of the scenario path to replace results later
+    scenario_year = scenario_folder[-4:] # STRING of scenario year
+    
     asset_parameters_filename = os.path.join(scenario_folder, "Asset_Parameters.csv")
     location_parameters_filename = os.path.join(scenario_folder, "Location_Parameters.csv")
     system_parameters_filename = os.path.join(scenario_folder, "System_Parameters.csv")
@@ -112,16 +118,26 @@ for counter1 in range(len(scenario_folders_list)):
                                             save_path=os.path.join(results_folder, "asset_sizes", f"{scenario}.png"))
     
     # Save results for asset flows and total data per scenario
-    t_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
-    t1_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
+    results_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
+    results_rounded_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
+    
+    
+    
     if counter1 == 0:
-        total_df = t_df
-        total_df_1 = t1_df
+        total_results = results_df
+        total_results_rounded = results_rounded_df
     else:
         # Concatenate next scenario's results into one dataframe
-        total_df = pd.concat([total_df, t_df], ignore_index=True)
-        total_df_1 = pd.concat([total_df_1, t1_df], ignore_index=True)
+        total_results = pd.concat([total_results, results_df], ignore_index=True)
+        total_results_rounded = pd.concat([total_results_rounded, results_rounded_df], ignore_index=True)
     
+    # This works for all PV existing in MEX case study, updates well. Will need to add a condition to meet
+    # Location column AND description column do be able to differenciate with other case studies
+    pv_lim = 'RE_PV_Openfield_Lim'
+    pv_existing = 'RE_PV_Existing'  
+    get_new_input_params.update_existing_RE_capacity(my_network, pv_lim, pv_existing,
+                                    assets_folder, scenario_year)
+        
     # flows_df = Results.export_aut_flows(my_network)
     flows_df = Results.export_collab_flows(my_network, location_parameters_df)
     
@@ -132,10 +148,14 @@ for counter1 in range(len(scenario_folders_list)):
     curtailment_filename = os.path.join(results_folder, f"curtailment_{my_network.scenario_name}.csv")
     curtailment.to_csv(curtailment_filename, index=False, header=True)
     flows_df.to_csv(flows_filename, index=False, header=True)
+    
+    
+    
+    
 
 # # Save total_data for all scenarios into a single csv file
-total_df.to_csv(results_filename, index=False, header=True)
-total_df_1.to_csv(rounded_results_filename, index=False, header=True)
+total_results.to_csv(results_filename, index=False, header=True)
+total_results_rounded.to_csv(rounded_results_filename, index=False, header=True)
 # Save flows into a separate file
 end_time = time.time()
 print("Time taken to build, update and solve:", end_time - start_time, "s")
