@@ -155,37 +155,38 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None)
     # PV Capacity
     if "RE_PV_Existing" in asset_class_list:
         existing_pv = float(og_df.query("Asset_Class == 'RE_PV_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total PV", existing_pv, color=pv_colors[0], label="PV Existing"))
+        bars.append(plt.bar("Total PV", existing_pv, color=pv_colors[0], label="PV Existing", zorder=3))
 
         if "RE_PV_Openfield_Lim" in asset_class_list:
             new_pv = float(og_df.query("Asset_Class == 'RE_PV_Openfield_Lim'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total PV", new_pv, bottom=existing_pv, color=pv_colors[1], label="PV New"))
+            bars.append(plt.bar("Total PV", new_pv, bottom=existing_pv, color=pv_colors[1], label="PV New", zorder=3))
 
     # Wind Capacity
     if "RE_WIND_Existing" in asset_class_list:
         existing_wind = float(og_df.query("Asset_Class == 'RE_WIND_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total Wind", existing_wind, color=wind_colors[0], label="Wind Existing"))
+        bars.append(plt.bar("Total Wind", existing_wind, color=wind_colors[0], label="Wind Existing", zorder=3))
 
         if "RE_WIND_Onshore_Lim" in asset_class_list:
             new_wind = float(og_df.query("Asset_Class == 'RE_WIND_Onshore_Lim'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total Wind", new_wind, bottom=existing_wind, color=wind_colors[1], label="Wind New"))
+            bars.append(plt.bar("Total Wind", new_wind, bottom=existing_wind, color=wind_colors[1], label="Wind New", zorder=3))
 
     # Fossil Generation
     if "PP_CO2_Existing" in asset_class_list:
         existing_fossil = float(og_df.query("Asset_Class == 'PP_CO2_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Fossil Gen.", existing_fossil, color=pp_colors[0], label="Fossil Existing"))
+        bars.append(plt.bar("Fossil Gen.", existing_fossil, color=pp_colors[0], label="Fossil Existing", zorder=3))
         
-    if "BESS" in asset_class_list:
-        new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total BESS", new_bess, color=bess_colors[1], label="BESS New"))
+    # BESS assets
+    if "BESS_Existing" in asset_class_list:
+        existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
+        bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing", zorder=3))
         
-        if "BESS_Existing" in asset_class_list:
-            existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing"))
+        if "BESS" in asset_class_list:
+            new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
+            bars.append(plt.bar("Total BESS", new_bess, bottom=existing_bess, color=bess_colors[1], label="BESS New", zorder=3))
     
     if "EL_Transport" in asset_class_list:
         hvdc_cable = float(og_df.query("Asset_Class == 'EL_Transport'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("EL_Transport", hvdc_cable, color=hvdc_color, label="HVDC Cable"))
+        bars.append(plt.bar("EL_Transport", hvdc_cable, color=hvdc_color, label="HVDC Cable", zorder=3))
     
     
     plt.xlabel(loc_name)
@@ -195,6 +196,7 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None)
     # Use only unique labels in the legend to avoid duplicates
     handles, labels = plt.gca().get_legend_handles_labels()
     unique_labels = dict(zip(labels, handles))
+    plt.grid(zorder=0)
     plt.legend(unique_labels.values(), unique_labels.keys())
     
     if save_path:
