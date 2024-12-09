@@ -5,6 +5,7 @@
 3,RE_PV_Openfield_Lim,0,0,0,730,1,0
 4,RE_WIND_Onshore_Lim,0,0,0,730,1,0
 5,BESS,0,0,0,730,1,0
-6,PP_CO2,0,0,0,730,1,0
-7,PP_CO2_Existing,0,0,0,730,1,0
-8,EL_Demand,0,0,0,730,1,0
+6,BESS_Existing,0,0,0,730,1,0
+7,PP_CO2,0,0,0,730,1,0
+8,PP_CO2_Existing,0,0,0,730,1,0
+9,EL_Demand,0,0,0,730,1,0

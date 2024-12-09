@@ -3,6 +3,9 @@
 Created on Sat Jul  2 17:41:01 2022
 
 @author: aniq_
+
+Adapted 
+@author: Mónica Sagastuy-Breña
 """
 
 # from __init__.py import *
@@ -132,6 +135,24 @@ def plot_asset_sizes(my_network, bar_width = 1.0, bar_spacing = 3.0):
     return
 
 def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None):
+    '''
+    Manually hard-coded for specific assets in system for my thesis, needs to be
+    generalised if more assets need to be plotted
+
+    Parameters
+    ----------
+    my_network : STEVFNs network
+        Full network after running a STEVFNs modelling iteration
+    location_parameters_df : DataFrame
+        Contains coordinates and labels to find the location name and plot
+    save_path : PATH, optional
+        Path to save the plot to if it needs to be saved. The default is None.
+
+    Returns
+    -------
+    None.
+
+    '''
     og_df = my_network.system_structure_df.copy()
     asset_sizes_array = np.array([my_network.assets[counter].asset_size() for counter in range(len(og_df))])
     og_df["Asset_Size"] = asset_sizes_array
@@ -179,10 +200,12 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None)
     if "BESS_Existing" in asset_class_list:
         existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
         bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing", zorder=3))
+    else:
+        existing_bess=0
         
-        if "BESS" in asset_class_list:
-            new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total BESS", new_bess, bottom=existing_bess, color=bess_colors[1], label="BESS New", zorder=3))
+    if "BESS" in asset_class_list:
+        new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
+        bars.append(plt.bar("Total BESS", new_bess, bottom=existing_bess, color=bess_colors[1], label="BESS New", zorder=3))
     
     if "EL_Transport" in asset_class_list:
         hvdc_cable = float(og_df.query("Asset_Class == 'EL_Transport'")['Asset_Size'].iloc[0])
