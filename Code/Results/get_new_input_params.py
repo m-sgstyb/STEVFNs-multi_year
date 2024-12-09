@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
-                                assets_folder, iteration_year):
+                                assets_folder, iteration_year, case_study_name):
     """
     Calculates the updated existing capacity for a given technology after an iteration.
     Value should be input into Assets/tech_existing/parameters.csv
@@ -51,18 +51,14 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
             df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
             
             # Find row that has description column value equal to the iteration year
-            # Need to figure out if I can change datatypes when reading the csv. 
-            # Sometimes it reads description column as float and sometimes as string
-            # I want to generalize so that every parameters.csv file can be identified the same
-            id_row = df.index[df['description'] == iteration_year].tolist()
+
+            id_row = df.index[df['iteration'] == iteration_year and df['location_name'] == case_study_name].tolist()
             # print("ID_ROW", id_row)
             df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity    
             
     return df.to_csv(os.path.join(asset_folder, 'parameters.csv'), index=False)
         
-# def update_existing_RE_capacity(my_network, )
-        
-def update_FF_existing_cap(my_network):
+def update_FF_existing_cap(my_network, assets_folder, iteration_year):
     '''
     Updates existing fossil power plant capacity. Value should be input to
     Assets/PP_CO2_Existing/parameters.csv
@@ -83,6 +79,12 @@ def update_FF_existing_cap(my_network):
     for asset in my_network.assets:
         if asset.asset_name == 'PP_CO2':
             new_capacity = asset.asset_size()
+            
+    
+            asset_folder = os.path.join(assets_folder, 'PP_CO2')
+            df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
+            id_row = df.index[df['iteration'] == iteration_year].tolist()
+            df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity   
     return new_capacity
 
 
