@@ -1,137 +1,245 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jul  2 17:41:01 2022
+Created on Fri Nov 29 18:43:22 2024
 
-@author: aniq_
-
-Adapted 
 @author: Mónica Sagastuy-Breña
 """
 
-# from __init__.py import *
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from ..Plotting import bar_chart_artist, stackplot_artist, twin_line_artist
+from scipy.optimize import curve_fit
+from sklearn.metrics import r2_score
+from Code.Results import get_new_input_params
 
+def logistic_curve(t, K, r, t0):
+    '''
+    
 
-def plot_asset_sizes(my_network, bar_width = 1.0, bar_spacing = 3.0):
-    # Plots the size of assets in the system #
+    Parameters
+    ----------
+    t : TYPE
+        DESCRIPTION.
+    K : TYPE
+        DESCRIPTION.
+    r : TYPE
+        DESCRIPTION.
+    t0 : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    return K / (1 + np.exp(-r * (t - t0)))
+
+def logistic_curve_derivative(t, K, r, t0):
+    '''
     
-    # Find maximum asset size so that we can remove assets that are too small, i.e. size zero.
-    og_df = my_network.system_structure_df.copy()
-    asset_sizes_array = np.zeros(og_df.shape[0])
-    for counter1 in range(len(asset_sizes_array)):
-        asset_sizes_array[counter1] = my_network.assets[counter1].asset_size()
-    og_df["Asset_Size"] = asset_sizes_array
-    max_asset_size = np.max(asset_sizes_array)
+
+    Parameters
+    ----------
+    t : TYPE
+        DESCRIPTION.
+    K : TYPE
+        DESCRIPTION.
+    r : TYPE
+        DESCRIPTION.
+    t0 : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    return (r * K * np.exp(-r * (t - t0))) / ((1 + np.exp(-r * (t - t0)))**2)
+
+def linear_approximation(t, m, b):
+    '''
     
-    # Set minimum asset size to plot
-    min_asset_size = max_asset_size * 1E-3
+
+    Parameters
+    ----------
+    t : TYPE
+        DESCRIPTION.
+    m : TYPE
+        DESCRIPTION.
+    b : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    return m * t + b
+
+def fit_s_curves(case_study_folder, tech_lim, assets_folder,
+                  goal_capacity, goal_year, historical_data_file):
+    '''
     
-    # Remove all assets that are too small
-    con1 = og_df["Asset_Size"] >= min_asset_size
-    og_df = og_df[con1]
+
+    Parameters
+    ----------
+    case_study_folder : TYPE
+        DESCRIPTION.
+    tech_lim : TYPE
+        DESCRIPTION.
+    assets_folder : TYPE
+        DESCRIPTION.
+    goal_capacity : TYPE
+        DESCRIPTION.
+    goal_year : TYPE
+        DESCRIPTION.
+    historical_data_file : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    K_fit : TYPE
+        DESCRIPTION.
+    r_fit : TYPE
+        DESCRIPTION.
+    t0_fit : TYPE
+        DESCRIPTION.
+    years : TYPE
+        DESCRIPTION.
+    capacities : TYPE
+        DESCRIPTION.
+
+    '''
+    data = pd.read_csv(historical_data_file)
+    goal_capacity = get_new_input_params.get_30y_opt_capacities(case_study_folder,
+                                                                tech_lim,
+                                                                assets_folder)
+    years = data['year'].values
+    if tech_lim[0:4] == 'RE_PV':
+        capacities = data['pv_installed_capacity_GW'].values
+    elif tech_lim[0:4] == 'RE_WI':
+        capacities = data['wind_installed_capacity_GW'].values
+        
+    # Append the goal data point to the historical data
+    years_with_goal = np.append(years, goal_year)
+    capacities_with_goal = np.append(capacities, goal_capacity)
+
+    # Initial guesses and bounds to delay inflection
+    initial_guess = [goal_capacity, 0.2, 2030]  # K, r, t0
+    bounds = ([max(capacities), 0.01, 2030], [goal_capacity * 1.5, 1, 2055])
+
+    # Fit the logistic curve with bounds using the augmented data
+    params, _ = curve_fit(
+        logistic_curve,
+        years_with_goal,
+        capacities_with_goal,
+        p0=initial_guess,
+        bounds=bounds
+    )
+    K_fit, r_fit, t0_fit = params
+
+    return K_fit, r_fit, t0_fit, years, capacities
+
+def approximate_scurve_derivative(case_study_folder, tech_lim, assets_folder,
+                                  goal_capacity, goal_year, historical_data_file):
+    '''
     
-    # Remove CO2 Budget asset in plot to not skew barchart
-    con2 = og_df['Asset_Class'] != 'CO2_Budget'
-    og_df = og_df[con2]
-    
-    # initialize bar data dictionary for plotting assets of a system#
-    bar_data_dict = dict()
-    asset_class_list = np.sort(og_df["Asset_Class"].unique())
-    for counter1 in range(len(asset_class_list)):
-        bar_data = dict({
-            "x" : [],
-            "height" : [],
-            })
-        bar_data_dict.update({
-            asset_class_list[counter1] : bar_data
-            })
-    # Initialize x ticks dictionary
-    x_ticks_data_dict = dict({
-        "ticks" : [],
-        "labels" : []
-        })
-    
-    #fill bar data dictionary for assets at a location i.e. loc_1 = loc_2
-    loc_1_array = np.sort(og_df["Location_1"].unique())
-    x_current = 0.0
-    
-    for counter1 in range(len(loc_1_array)):
-        loc_1 = loc_1_array[counter1]
-        loc_2 = loc_1
-        con1 = og_df["Location_1"] == loc_1
-        t_df1 = og_df[con1]
-        con2 = t_df1["Location_2"] == loc_2
-        t_df2 = t_df1[con2]
-        x_tick_0 = x_current
-        for counter2 in range(t_df2.shape[0]):
-            asset_data = t_df2.iloc[counter2]
-            #add size of asset in bar_data
-            asset_number = asset_data["Asset_Number"]
-            asset_size = my_network.assets[asset_number].asset_size()
-            # check if asset is too small
-            if asset_size < min_asset_size:
-                continue
-            bar_data_dict[asset_data["Asset_Class"]]["height"] += [asset_size]
-            #add x location of asset in bar_data
-            bar_data_dict[asset_data["Asset_Class"]]["x"] += [x_current + bar_width/2]
-            #move to next asset
-            x_current += bar_width
-        #check if any asset was added to that location pair
-        if x_current == x_tick_0:
-            continue
-        #add entry to x_ticks
-        x_ticks_data_dict["labels"] += ["(" + str(loc_1) + ")"]
-        x_ticks_data_dict["ticks"] += [(x_tick_0 + x_current)/2]
-        #move to next location
-        x_current += bar_spacing
+
+    Parameters
+    ----------
+    case_study_folder : TYPE
+        DESCRIPTION.
+    tech_lim : TYPE
+        DESCRIPTION.
+    assets_folder : TYPE
+        DESCRIPTION.
+    goal_capacity : TYPE
+        DESCRIPTION.
+    goal_year : TYPE
+        DESCRIPTION.
+    historical_data_file : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    derivative_years : TYPE
+        DESCRIPTION.
+    derivative_values : TYPE
+        DESCRIPTION.
+
+    '''
+    K_fit, r_fit, t0_fit, years, capacities = fit_s_curves(case_study_folder, tech_lim, assets_folder,
+                                        goal_capacity, goal_year, historical_data_file)
+    # Calculate slope (m) at inflection point
+    m = logistic_curve_derivative(t0_fit, K_fit, r_fit, t0_fit)
+    b = logistic_curve(t0_fit, K_fit, r_fit, t0_fit) - m * t0_fit
+    # Generate linear section (±5 years around t0)
+    derivative_years = np.arange(int(t0_fit) - 5, int(t0_fit) + 6)
+    derivative_values = linear_approximation(derivative_years, m, b)
+    return derivative_years, derivative_values
     
     
-    #fill bar data dictionary for assets between locations
+def plot_scurves(case_study_folder, tech_lim, assets_folder,
+                 goal_capacity, goal_year, historical_data_file):
+    '''
     
-    for counter1 in range(len(loc_1_array)):
-        loc_1 = loc_1_array[counter1]
-        con1 = og_df["Location_1"] == loc_1
-        t_df1 = og_df[con1]
-        loc_2_array = np.sort(t_df1["Location_2"].unique())
-        for counter2 in range(len(loc_2_array)):
-            loc_2 = loc_2_array[counter2]
-            #check if asset is between locations
-            if loc_2 == loc_1:
-                continue
-            con2 = t_df1["Location_2"] == loc_2
-            t_df2 = t_df1[con2]
-            x_tick_0 = x_current
-            for counter3 in range(t_df2.shape[0]):
-                asset_data = t_df2.iloc[counter3]
-                #add size of asset in bar_data
-                asset_number = asset_data["Asset_Number"]
-                asset_size = my_network.assets[asset_number].asset_size()
-                # check if asset is too small
-                if asset_size < min_asset_size:
-                    continue
-                bar_data_dict[asset_data["Asset_Class"]]["height"] += [asset_size]
-                #add x location of asset in bar_data
-                bar_data_dict[asset_data["Asset_Class"]]["x"] += [x_current + bar_width/2]
-                #move to next asset
-                x_current += bar_width
-            #check if any asset was added to that location pair
-            if x_current == x_tick_0:
-                continue
-            #add entry to x_ticks
-            x_ticks_data_dict["labels"] += ["(" + str(loc_1) + "," + str(loc_2) + ")"]
-            x_ticks_data_dict["ticks"] += [(x_tick_0 + x_current)/2]
-            #move to next location
-            x_current += bar_spacing
+
+    Parameters
+    ----------
+    case_study_folder : TYPE
+        DESCRIPTION.
+    tech_lim : TYPE
+        DESCRIPTION.
+    assets_folder : TYPE
+        DESCRIPTION.
+    goal_capacity : TYPE
+        DESCRIPTION.
+    goal_year : TYPE
+        DESCRIPTION.
+    historical_data_file : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    K_fit, r_fit, t0_fit, years, capacities = fit_s_curves(case_study_folder, tech_lim, assets_folder,
+                                        goal_capacity, goal_year, historical_data_file)
+    r_max = (r_fit * K_fit) / 4
+    extended_years = np.arange(years[0], 2056)
+    scurve_data = logistic_curve(extended_years, K_fit, r_fit, t0_fit)
     
-    #Make a bar chart artist and plot
-    my_artist = bar_chart_artist()
-    my_artist.bar_data_dict = bar_data_dict
-    my_artist.x_ticks_data_dict = x_ticks_data_dict
-    my_artist.ylabel = "Asset Size (GWh)"
-    my_artist.title = "Size of Assets in the System by Location and Location Pair \n Scenario: " + my_network.scenario_name
-    my_artist.plot(bar_width = bar_width, bar_spacing = bar_spacing)
+    derivative_years, derivative_values = approximate_scurve_derivative(case_study_folder, tech_lim, assets_folder,
+                                      goal_capacity, goal_year, historical_data_file)
+    
+    plt.figure(figsize=(12, 8))
+
+    plt.plot(extended_years, scurve_data, color='blue', linestyle='--', label='Projected Logistic Curve')
+    plt.scatter(years, capacities, color='red', marker='x', s=70, label='Actual Data')
+
+    # Plot the linear section near the inflection point
+    plt.plot(derivative_years, derivative_values, color='green', linestyle='-', label='Linear Approximation of derivative at $t_0$', linewidth=2)
+
+    # Highlight the inflection point
+    plt.scatter([t0_fit], [logistic_curve(t0_fit, K_fit, r_fit, t0_fit)], color='black', label='Inflection Point', zorder=5)
+    plt.annotate(f"\nt = {t0_fit:.2f},\n$r_{{max}}$ = {r_max:.2f} GW / year", 
+                 (t0_fit, logistic_curve(t0_fit, K_fit, r_fit, t0_fit)), 
+                 textcoords="offset points", 
+                 xytext=(-12, -60),
+                 fontsize=12,
+                 ha='left', color='black')
+
+    plt.xlabel('Year', fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.ylabel('Cumulative Installed Wind Capacity (GWp)', fontsize=14)
+    plt.yticks(fontsize=12)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
     return
 
 def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None):
@@ -228,122 +336,4 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None)
     plt.show()
     
     return 
-
-
-def plot_asset_costs(my_network, bar_width = 1.0, bar_spacing = 3.0):
-    # Plots the cost of assets in the system #
-    
-    # Find maximum asset size so that we can remove assets that are too small, i.e. size zero.
-    og_df = my_network.system_structure_df.copy()
-    asset_costs_array = np.zeros(og_df.shape[0])
-    for counter1 in range(len(asset_costs_array)):
-        asset_costs_array[counter1] = my_network.assets[counter1].cost.value
-    og_df["Asset_Cost"] = asset_costs_array
-    max_asset_cost = np.max(asset_costs_array)
-    # Set minimum asset size to plot
-    min_asset_cost = max_asset_cost * 1E-3
-    # Remove all assets that are too small
-    con1 = og_df["Asset_Cost"] >= min_asset_cost
-    og_df = og_df[con1]
-    
-    # initialize bar data dictionary for plotting assets of a system#
-    bar_data_dict = dict()
-    asset_class_list = np.sort(og_df["Asset_Class"].unique())
-    for counter1 in range(len(asset_class_list)):
-        bar_data = dict({
-            "x" : [],
-            "height" : [],
-            })
-        bar_data_dict.update({
-            asset_class_list[counter1] : bar_data
-            })
-    # Initialize x ticks dictionary
-    x_ticks_data_dict = dict({
-        "ticks" : [],
-        "labels" : []
-        })
-    
-    #fill bar data dictionary for assets at a location i.e. loc_1 = loc_2
-    loc_1_array = np.sort(og_df["Location_1"].unique())
-    x_current = 0.0
-    
-    for counter1 in range(len(loc_1_array)):
-        loc_1 = loc_1_array[counter1]
-        loc_2 = loc_1
-        con1 = og_df["Location_1"] == loc_1
-        t_df1 = og_df[con1]
-        con2 = t_df1["Location_2"] == loc_2
-        t_df2 = t_df1[con2]
-        x_tick_0 = x_current
-        for counter2 in range(t_df2.shape[0]):
-            asset_data = t_df2.iloc[counter2]
-            #add size of asset in bar_data
-            asset_number = asset_data["Asset_Number"]
-            asset_cost = my_network.assets[asset_number].cost.value
-            # check if asset is too small
-            if asset_cost < min_asset_cost:
-                continue
-            bar_data_dict[asset_data["Asset_Class"]]["height"] += [asset_cost]
-            #add x location of asset in bar_data
-            bar_data_dict[asset_data["Asset_Class"]]["x"] += [x_current + bar_width/2]
-            #move to next asset
-            x_current += bar_width
-        #check if any asset was added to that location pair
-        if x_current == x_tick_0:
-            continue
-        #add entry to x_ticks
-        x_ticks_data_dict["labels"] += ["(" + str(loc_1) + ")"]
-        x_ticks_data_dict["ticks"] += [(x_tick_0 + x_current)/2]
-        #move to next location
-        x_current += bar_spacing
-    
-    
-    #fill bar data dictionary for assets between locations
-    
-    for counter1 in range(len(loc_1_array)):
-        loc_1 = loc_1_array[counter1]
-        con1 = og_df["Location_1"] == loc_1
-        t_df1 = og_df[con1]
-        loc_2_array = np.sort(t_df1["Location_2"].unique())
-        for counter2 in range(len(loc_2_array)):
-            loc_2 = loc_2_array[counter2]
-            #check if asset is between locations
-            if loc_2 == loc_1:
-                continue
-            con2 = t_df1["Location_2"] == loc_2
-            t_df2 = t_df1[con2]
-            x_tick_0 = x_current
-            for counter3 in range(t_df2.shape[0]):
-                asset_data = t_df2.iloc[counter3]
-                #add size of asset in bar_data
-                asset_number = asset_data["Asset_Number"]
-                asset_cost = my_network.assets[asset_number].cost.value
-                # check if asset is too small
-                if asset_cost < min_asset_cost:
-                    continue
-                bar_data_dict[asset_data["Asset_Class"]]["height"] += [asset_cost]
-                #add x location of asset in bar_data
-                bar_data_dict[asset_data["Asset_Class"]]["x"] += [x_current + bar_width/2]
-                #move to next asset
-                x_current += bar_width
-            #check if any asset was added to that location pair
-            if x_current == x_tick_0:
-                continue
-            #add entry to x_ticks
-            x_ticks_data_dict["labels"] += ["(" + str(loc_1) + "," + str(loc_2) + ")"]
-            x_ticks_data_dict["ticks"] += [(x_tick_0 + x_current)/2]
-            #move to next location
-            x_current += bar_spacing
-    
-    #Make a bar chart artist and plot
-    my_artist = bar_chart_artist()
-    my_artist.bar_data_dict = bar_data_dict
-    my_artist.x_ticks_data_dict = x_ticks_data_dict
-    my_artist.ylabel = "Asset Cost (Billion USD)"
-    my_artist.title = "Cost of Assets in the System by Location and Location Pair \n Scenario: " + my_network.scenario_name
-    my_artist.text_data = {"x": 0.12, "y": 0.5, "s": "Total Cost = " + f"{my_network.cost.value: .5}" + " Bil USD"}
-    my_artist.plot(bar_width = bar_width, bar_spacing = bar_spacing)
-    return
-
-
 

@@ -8,6 +8,9 @@ Created on Tue Nov 26 20:03:33 2024
 
 import pandas as pd
 import numpy as np
+from scipy.optimize import curve_fit
+from sklearn.metrics import r2_score
+from Code.Plotting import DPhil_Plotting
 import os
 
 def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
@@ -24,8 +27,8 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
         Asset name for the limited capacity technology (e.g., 'RE_PV_Openfield_Lim').
     tech_existing : str
         Asset name for the existing capacity technology (e.g., 'RE_PV_Existing').
-    asset_folder : path
-        Path to the Assets folder in the Code for STEVFNs
+    assets_folder : path
+        Path to the "Assets" folder in STEVFNS > Code
     iteration_year : str
         String of the end year being modelled. i.e. if the period 2020-2030 is being modelled,
         iteration_year would be '2030'
@@ -50,43 +53,89 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
             asset_folder = os.path.join(assets_folder, tech_existing)
             df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
             
-            # Find row that has description column value equal to the iteration year
-
+            # Find row for country and iteration year to be updated
             id_row = df.index[df['iteration'] == iteration_year and df['location_name'] == case_study_name].tolist()
-            # print("ID_ROW", id_row)
             df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity    
             
     return df.to_csv(os.path.join(asset_folder, 'parameters.csv'), index=False)
         
-def update_FF_existing_cap(my_network, assets_folder, iteration_year):
+def update_FF_existing_cap(my_network, assets_folder, iteration_year, case_study_name):
     '''
-    Updates existing fossil power plant capacity. Value should be input to
-    Assets/PP_CO2_Existing/parameters.csv
-    
+    Updates existing fossil power plant capacity, should be decreasing
 
     Parameters
     ----------
     my_network : STEVFNs NETWORK
         Network built after running my_network.build function in main.py.
+    assets_folder : path
+        Path to the Assets folder in the Code for STEVFNs
+    iteration_year : str
+        String of the end year being modelled. i.e. if the period 2020-2030 is being modelled,
+        iteration_year would be '2030'
+    case_study_name : str
+        Case study name which is defined at the start of main.py.
 
     Returns
     -------
-    new_capacity : FLOAT
-        New capacity for existing FF. As emissions constraints increase, this value should
-        decrease per iteration
+    CSV FILE
+        Updated paramters.csv file saved in the asset folder for next run
 
     '''
     for asset in my_network.assets:
-        if asset.asset_name == 'PP_CO2':
-            new_capacity = asset.asset_size()
+        if asset.asset_name == 'PP_CO2' and asset.asset_size() <= 5e-4:
+            continue
             
-    
-            asset_folder = os.path.join(assets_folder, 'PP_CO2')
+        if asset.asset_name == 'PP_CO2_Existing':
+            new_existing = asset.asset_size()
+            asset_folder = os.path.join(assets_folder, 'PP_CO2_Existing')
             df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
-            id_row = df.index[df['iteration'] == iteration_year].tolist()
-            df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity   
-    return new_capacity
+            id_row = df.index[df['iteration'] == iteration_year and df['location_name'] == case_study_name].tolist()
+            df.at[id_row[0], 'existing_capacity'] = new_existing  
+    return df.to_csv(os.path.join(asset_folder, 'parameters.csv', index=False))
 
+def get_30y_opt_capacities(case_study_folder, tech_lim, assets_folder):
+    # Find 30y case study folder
+    ref_case_study_dir = f'{case_study_folder}_30y'
+    results_filename = os.path.join(ref_case_study_dir, 'Results', 'results.csv')
+    df = pd.read_csv(results_filename)
+    country_id = os.path.basename(case_study_folder)
+    id_row = df.index[df['technology_name'] == f'{tech_lim}_[{country_id}]'].tolist()
+    opt_capacity = df.at[id_row[0], 'technology_size']
+    
+    return opt_capacity
+
+def get_max_growth_rate(case_study_folder, tech_lim, assets_folder,
+                  goal_capacity, goal_year, historical_data_file):
+    '''
+    
+
+    Parameters
+    ----------
+    case_study_folder : TYPE
+        DESCRIPTION.
+    tech_lim : TYPE
+        DESCRIPTION.
+    assets_folder : TYPE
+        DESCRIPTION.
+    goal_capacity : TYPE
+        DESCRIPTION.
+    goal_year : TYPE
+        DESCRIPTION.
+    historical_data_file : TYPE
+        DESCRIPTION.
+     : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    r_max : TYPE
+        DESCRIPTION.
+
+    '''
+    K_fit, r_fit, t0_fit, years, capacities = DPhil_Plotting.fit_s_curves(case_study_folder, tech_lim, assets_folder,
+                      goal_capacity, goal_year, historical_data_file)
+    r_max = (r_fit * K_fit) / 4
+    return r_max
 
 def update_RE_installable_cap(my_network, t, input_file, tech_lim, tech_existing):
     '''

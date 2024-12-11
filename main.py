@@ -70,10 +70,13 @@ print("Time taken to build network = ", build_time - start_time, "s")
 total_df = pd.DataFrame()
 total_df_1 = pd.DataFrame()
 
-for counter1 in range(len(scenario_folders_list)):
-# for counter1 in range(1):
+# Sort scenario folders list so it starts with 2030 upwards
+scenario_folders_list.sort()
+
+for scenario in range(len(scenario_folders_list)):
+# for scenario in range(1):
     # Read Input Files ###
-    scenario_folder = scenario_folders_list[counter1]
+    scenario_folder = scenario_folders_list[scenario]
     # Get year value out of the scenario path to replace results later
     scenario_year = scenario_folder[-4:] # STRING of scenario year
     
@@ -112,10 +115,9 @@ for counter1 in range(len(scenario_folders_list)):
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
     # DPhil_Plotting.plot_asset_sizes(my_network)
-    scenario = str(my_network.scenario_name)
     DPhil_Plotting.plot_asset_sizes_stacked(my_network,
                                             location_parameters_df,
-                                            save_path=os.path.join(results_folder, "asset_sizes", f"{scenario}.png"))
+                                            save_path=os.path.join(results_folder, "asset_sizes", f"{my_network.scenario_name}.png"))
     
     # Save results for asset flows and total data per scenario
     results_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
@@ -123,7 +125,7 @@ for counter1 in range(len(scenario_folders_list)):
     
     
     
-    if counter1 == 0:
+    if scenario == 0:
         total_results = results_df
         total_results_rounded = results_rounded_df
     else:
