@@ -360,8 +360,8 @@ def export_aut_flows(my_network):
         
         elif name == 'BESS':
             BESS_ch = asset.assets_dictionary['Charging'].flows.value
-            BESS_disch = asset.assets_dictionary['Discharging'].flows.value
-            df = pd.DataFrame({"BESS_Charging": BESS_ch, "BESS_Discharging": BESS_disch})
+            # BESS_disch = asset.assets_dictionary['Discharging'].flows.value
+            df = pd.DataFrame({"BESS_Charging": BESS_ch})
             data_frames.append(df)
         
         elif name in ['PP_CO2', 'PP_CO2_Existing']:
