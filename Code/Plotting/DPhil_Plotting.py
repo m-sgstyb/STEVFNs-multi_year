@@ -118,9 +118,9 @@ def fit_s_curves(case_study_folder, tech_lim, assets_folder,
                                                                 tech_lim,
                                                                 assets_folder)
     years = data['year'].values
-    if tech_lim[0:4] == 'RE_PV':
+    if tech_lim[0:5] == 'RE_PV':
         capacities = data['pv_installed_capacity_GW'].values
-    elif tech_lim[0:4] == 'RE_WI':
+    elif tech_lim[0:5] == 'RE_WI':
         capacities = data['wind_installed_capacity_GW'].values
         
     # Append the goal data point to the historical data

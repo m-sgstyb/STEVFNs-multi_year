@@ -32,6 +32,8 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
     iteration_year : str
         String of the end year being modelled. i.e. if the period 2020-2030 is being modelled,
         iteration_year would be '2030'
+    case_study_name : str
+        Case study name defined to run main.py
 
     Returns
     -------
@@ -54,7 +56,7 @@ def update_existing_RE_capacity(my_network, tech_lim, tech_existing,
             df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
             
             # Find row for country and iteration year to be updated
-            id_row = df.index[df['iteration'] == iteration_year and df['location_name'] == case_study_name].tolist()
+            id_row = df.index[(df['iteration'] == iteration_year) & (df['location_name'] == case_study_name)].tolist()
             df.at[id_row[0], 'existing_capacity'] = previous_existing + new_capacity    
             
     return df.to_csv(os.path.join(asset_folder, 'parameters.csv'), index=False)
@@ -91,9 +93,28 @@ def update_FF_existing_cap(my_network, assets_folder, iteration_year, case_study
             df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
             id_row = df.index[df['iteration'] == iteration_year and df['location_name'] == case_study_name].tolist()
             df.at[id_row[0], 'existing_capacity'] = new_existing  
+    
     return df.to_csv(os.path.join(asset_folder, 'parameters.csv', index=False))
 
 def get_30y_opt_capacities(case_study_folder, tech_lim, assets_folder):
+    '''
+    
+
+    Parameters
+    ----------
+    case_study_folder : path
+        Path to the case study folder that is running.
+    tech_lim : str
+        Asset name for the limited capacity technology (e.g., 'RE_PV_Openfield_Lim').
+    assets_folder : path
+        Path to the Assets folder in the Code for STEVFNs
+
+    Returns
+    -------
+    opt_capacity : float
+        Value for the final optimal capacity after 30-year modeling.
+
+    '''
     # Find 30y case study folder
     ref_case_study_dir = f'{case_study_folder}_30y'
     results_filename = os.path.join(ref_case_study_dir, 'Results', 'results.csv')
@@ -105,96 +126,166 @@ def get_30y_opt_capacities(case_study_folder, tech_lim, assets_folder):
     return opt_capacity
 
 def get_max_growth_rate(case_study_folder, tech_lim, assets_folder,
-                  goal_capacity, goal_year, historical_data_file):
+                        goal_year, historical_data_file):
     '''
     
 
     Parameters
     ----------
-    case_study_folder : TYPE
-        DESCRIPTION.
-    tech_lim : TYPE
-        DESCRIPTION.
-    assets_folder : TYPE
-        DESCRIPTION.
-    goal_capacity : TYPE
-        DESCRIPTION.
-    goal_year : TYPE
-        DESCRIPTION.
-    historical_data_file : TYPE
-        DESCRIPTION.
-     : TYPE
-        DESCRIPTION.
+    case_study_folder : path
+        Path to the case study folder that is running.
+    tech_lim : str
+        Asset name for the limited capacity technology (e.g., 'RE_PV_Openfield_Lim').
+    assets_folder : path
+        Path to the Assets folder in the Code for STEVFNs.
+    goal_year : int
+        Goal year to end the modeling, e.g. 2060.
+    historical_data_file : path
+        Path to the file where the historical capacity data is stored.
 
     Returns
     -------
-    r_max : TYPE
-        DESCRIPTION.
+    r_max : float
+        Maximum rate of adoption obtained from S-curve fitting.
 
     '''
+    goal_capacity = get_30y_opt_capacities(case_study_folder, tech_lim, assets_folder)
+    
     K_fit, r_fit, t0_fit, years, capacities = DPhil_Plotting.fit_s_curves(case_study_folder, tech_lim, assets_folder,
                       goal_capacity, goal_year, historical_data_file)
     r_max = (r_fit * K_fit) / 4
+    
     return r_max
 
-def update_RE_installable_cap(my_network, t, input_file, tech_lim, tech_existing):
+def get_scenario_year(scenario_folder):
     '''
-    With the logistic function, finds capacity for technology at time t.
-    Uses the new existing capacity value from previous iteration to update the 
-    remaining installable capacity in next time period
-    Value for tech_lim should be input into Assets/tech_lim/parameters.csv
+    Parameters
+    ----------
+    scenario_folder : path
+         Path to the scenario folder that is running inside the for loop in main.py
+
+    Returns
+    -------
+    scenario_year : int
+        Value for the scenario year, e.g. 2030.
+
+    '''
+    scenario_name = os.path.basename(scenario_folder)
+    scenario_year = int(scenario_name.split('_')[1])
+    return scenario_year
+
+def get_prev_existing_capacity(scenario_folder, assets_folder, tech_existing,
+                               case_study_name):
+    '''
+    
 
     Parameters
     ----------
-    my_network : STEVFNs NETWORK
-        Network built after running my_network.build function in main.py
-    t : INT
-        End year of the iteration period, e.g. if running from 2020-2030, t is 2030
-        Finds the total installed capacity at this point given by the logistic adoption
-        curve
-    input_file : PATH
-        To a csv file containing logistic function parameters for countries and
-        technologies
+    scenario_folder : path
+         Path to the scenario folder that is running inside the for loop in main.py
+    assets_folder : path
+        Path to the "Assets" folder in STEVFNS > Code
+    tech_existing : str
+        Asset name for the existing capacity technology (e.g., 'RE_PV_Existing').
+    case_study_name : str
+        Case study name defined to run main.py
+
+    Returns
+    -------
+    None.
+
+    '''
+    scenario_year = get_scenario_year(scenario_folder)
+    asset_folder = os.path.join(assets_folder, tech_existing)
+    df = pd.read_csv(os.path.join(asset_folder, 'parameters.csv'))
+    # Get existing capacity for previous modeled period
+    id_row = df.index[(df['iteration'] == str(scenario_year)) & (df['location_name'] == case_study_name)]
+    previous_existing = df.at[int(id_row[0]-1), 'existing_capacity']
+    
+    return scenario_year, previous_existing
+    
+def update_RE_installable_cap(my_network, case_study_folder, scenario_folder, tech_lim,
+                              tech_existing, assets_folder, goal_year, historical_data_file,
+                              t_i=2025, t_f=2060, dt=5):
+    '''
+    
+
+    Parameters
+    ----------
+    my_network : STEVFNs network
+        Network built after running my_network.build function in main.py.
+    case_study_folder : path
+        Path to the case study folder that is running.
+    scenario_folder : path
+         Path to the scenario folder that is running inside the for loop in main.py
     tech_lim : str
         Asset name for the limited capacity technology (e.g., 'RE_PV_Openfield_Lim').
     tech_existing : str
         Asset name for the existing capacity technology (e.g., 'RE_PV_Existing').
+    assets_folder : path
+        Path to the "Assets" folder in STEVFNS > Code
+    goal_year : int
+        Goal year to end the modeling, e.g. 2060.
+    historical_data_file : path
+        Path to the file where the historical capacity data is stored.
+    t_i : int, optional
+        start year of the whole period being modeled. The default is 2025.
+    t_f : int, optional
+        End year of the whole period being modeled. The default is 2060.
+    dt : int, optional
+        Number of years per iteration sub-period to be modeled. The default is 5.
 
     Returns
     -------
-    dict
-        A dictionary with country-technology keys and installable capacities as values.
+    None.
 
     '''
-    log_params_df = pd.read_csv(input_file)
+    case_study_name = os.path.basename(case_study_folder)
     
-    installable_capacities = {}
+    r_max = get_max_growth_rate(case_study_folder, tech_lim, assets_folder,
+                                goal_year, historical_data_file)
+    
+    scenario_year, previous_existing = get_prev_existing_capacity(scenario_folder,
+                                                                  assets_folder,
+                                                                  tech_existing,
+                                                                  case_study_name)
+    
+    k_goal = get_30y_opt_capacities(case_study_folder, tech_lim, assets_folder)
+    existing_asset_folder = os.path.join(assets_folder, tech_existing)
+    existing_params = pd.read_csv(os.path.join(existing_asset_folder, 'parameters.csv'))
+    
+    lim_asset_folder = os.path.join(assets_folder, tech_lim)
+    lim_params = pd.read_csv(os.path.join(lim_asset_folder, 'parameters.csv'))
+    
+    # Find prev iteration existing capacity
+    id_row = existing_params.index[(existing_params['iteration'] == str(scenario_year)) & (existing_params['location_name'] == case_study_name)].tolist()
+    k_existing = existing_params.at[int(id_row[0]-1), 'existing_capacity']
+    
+    if scenario_year == 2030:
+        k_opt = 0
+    else: 
+        for asset in my_network.assets:
+            if asset.asset_name == tech_lim:
+                k_opt = asset.asset_size()
+    
+    years_left = goal_year - scenario_year
 
-    for _, row in log_params_df.iterrows():
-        country = row['Country']
-        technology = row['Technology']
-        t = row['Year']
-        L = row['L']
-        t_alpha = row['t_alpha']
-        t_beta = row['t_beta']
-        alpha = row['alpha']
-        beta = row['beta']
+    k_existing += k_opt
+    
+    k_max = min(
+         k_goal - k_existing,
+         (r_max * dt)
+    )
 
-        # Calculate the logistic function parameters
-        k = (np.log((1 - beta) / beta) - np.log((1 - alpha) / alpha)) / (t_alpha - t_beta)
-        t0 = t_alpha + (np.log((1 - alpha) / alpha)) / k
-
-        # Calculate total installable capacity at year t
-        total_cap = L / (1 + np.exp(-k * (t - t0)))
-
-        # Update the installable capacity by subtracting the installed capacity
-        installed_cap = update_existing_RE_capacity(my_network, tech_lim, tech_existing)
-        installable_cap = total_cap - installed_cap
-
-        # Store the result in the dictionary with a composite key to ID country and tech
-        key = f"{country}_{technology}"
-        installable_capacities[key] = max(0, installable_cap)  # Ensure non-negative capacity
-
-    return installable_capacities
+    k_min = max((k_goal - (r_max * years_left)),
+                k_existing) - k_existing
+    
+    
+    id_row = lim_params.index[(lim_params['iteration'] == str(scenario_year)) & (lim_params['location_name'] == case_study_name)].tolist()
+    lim_params.at[int(id_row[0]+1), 'minimum_size'] = k_min
+    lim_params.at[int(id_row[0]+1), 'maximum_size'] = k_max
+    
+    
+    return lim_params.to_csv(os.path.join(lim_asset_folder, 'parameters.csv'), index=False)
 
 

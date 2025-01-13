@@ -1,9 +1,9 @@
 country_1,country_2,country_3,country_4,collaboration_emissions,technology_cost,technology_name,collaboration_emissions_MtCO2e/y,technology_cost_G$/y,technology_size
 MEX,,,,,,RE_PV_Existing_[MEX],0.0,0.0,10.893
 MEX,,,,,,RE_WIND_Existing_[MEX],0.0,0.0,7.318
-MEX,,,,,,RE_PV_Openfield_Lim_[MEX],0.0,5.76336939074781,164.66769687850885
-MEX,,,,,,RE_WIND_Onshore_Lim_[MEX],0.0,2.0058599337539733,75.21974751577399
-MEX,,,,,,BESS_[MEX],0.0,4.195737722284483,464.4728105849981
+MEX,,,,,,RE_PV_Openfield_Lim_[MEX],0.0,90.57797000000001,2587.942
+MEX,,,,,,RE_WIND_Onshore_Lim_[MEX],0.0,365.3565333333334,13700.87
+MEX,,,,,,BESS_[MEX],0.0,4336.36693288741,233694.58960833956
 MEX,,,,,,PP_CO2_[MEX],0.0,0.0,0.0
 MEX,,,,,,PP_CO2_Existing_[MEX],0.0,0.0,0.0
 MEX,,,,,,EL_Demand_[MEX],0.0,0.0,46.2074085

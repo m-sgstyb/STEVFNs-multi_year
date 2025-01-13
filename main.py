@@ -22,7 +22,7 @@ from Code.Results import Results
 from Code.Results import get_new_input_params
 
 #### Define Input Files ####
-case_study_name = "MEX"
+case_study_name = "MEX_30y"
 # case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 
@@ -48,6 +48,7 @@ for folder in os.listdir(case_study_folder):
     if os.path.isdir(full_path) and folder.startswith('scenario_'):
         scenario_folders_list.append(full_path)
     
+historical_data_file = os.path.join(case_study_folder, f're_historic_data_{case_study_name}.csv')
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
 #### Define Output Files ####
@@ -73,8 +74,8 @@ total_df_1 = pd.DataFrame()
 # Sort scenario folders list so it starts with 2030 upwards
 scenario_folders_list.sort()
 
-for scenario in range(len(scenario_folders_list)):
-# for scenario in range(1):
+# for scenario in range(len(scenario_folders_list)):
+for scenario in range(1):
     # Read Input Files ###
     scenario_folder = scenario_folders_list[scenario]
     # Get year value out of the scenario path to replace results later
@@ -117,7 +118,7 @@ for scenario in range(len(scenario_folders_list)):
     # DPhil_Plotting.plot_asset_sizes(my_network)
     DPhil_Plotting.plot_asset_sizes_stacked(my_network,
                                             location_parameters_df,
-                                            save_path=os.path.join(results_folder, "asset_sizes", f"{my_network.scenario_name}.png"))
+                                            save_path=os.path.join(results_folder, "asset_sizes", f"{my_network.scenario_name}_nocurtailment.png"))
     
     # Save results for asset flows and total data per scenario
     results_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
@@ -136,9 +137,54 @@ for scenario in range(len(scenario_folders_list)):
     # This works for all PV existing in MEX case study, updates well. Will need to add a condition to meet
     # Location column AND description column do be able to differenciate with other case studies
     pv_lim = 'RE_PV_Openfield_Lim'
-    pv_existing = 'RE_PV_Existing'  
-    get_new_input_params.update_existing_RE_capacity(my_network, pv_lim, pv_existing,
-                                    assets_folder, scenario_year, case_study_name)
+    pv_existing = 'RE_PV_Existing' 
+    wind_lim = 'RE_WIND_Onshore_Lim'
+    wind_existing = 'RE_WIND_Existing'
+    
+    # print("RMAX Wind", get_new_input_params.get_max_growth_rate(case_study_folder, wind_lim, assets_folder, 2055, historical_data_file))
+    # for tech in techs:
+    # get_new_input_params.update_existing_RE_capacity(my_network,
+    #                                                  pv_lim,
+    #                                                  pv_existing,
+    #                                                  assets_folder,
+    #                                                  scenario_year,
+    #                                                  case_study_name)
+    
+    # get_new_input_params.update_existing_RE_capacity(my_network,
+    #                                                  wind_lim, 
+    #                                                  wind_existing,
+    #                                                  assets_folder,
+    #                                                  scenario_year,
+    #                                                  case_study_name)
+    
+    # get_new_input_params.get_prev_existing_capacity(scenario_folder,
+    #                                                 assets_folder,
+    #                                                 pv_existing,
+    #                                                 case_study_name)
+    
+    # get_new_input_params.get_prev_existing_capacity(scenario_folder,
+    #                                                 assets_folder,
+    #                                                 wind_existing,
+    #                                                 case_study_name)
+    
+    # get_new_input_params.update_RE_installable_cap(my_network,
+    #                                                case_study_folder,
+    #                                                scenario_folder,
+    #                                                pv_lim,
+    #                                                pv_existing,
+    #                                                assets_folder,
+    #                                                2055,
+    #                                                historical_data_file)
+    
+    # get_new_input_params.update_RE_installable_cap(my_network,
+    #                                                case_study_folder,
+    #                                                scenario_folder,
+    #                                                wind_lim,
+    #                                                wind_existing,
+    #                                                assets_folder,
+    #                                                2055,
+    #                                                historical_data_file)
+
         
     # flows_df = Results.export_aut_flows(my_network)
     flows_df = Results.export_collab_flows(my_network, location_parameters_df)
