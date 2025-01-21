@@ -342,41 +342,61 @@ def export_aut_flows(my_network):
     '''
     # Initialize an empty list to hold DataFrames for each asset
     data_frames = []
-
+    
     # Iterate over each asset and collect flow data
     for i in range(1, len(my_network.assets)):
         asset = my_network.assets[i]
         name = asset.asset_name
         
-        if name == 'EL_Demand_UM':
-            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value
-            df = pd.DataFrame({"Net_demand": demand_data})
-            data_frames.append(df)
-        
-        elif name == 'EL_Demand':
+        if name == 'EL_Demand':
             demand_data = asset.flows.value
-            df = pd.DataFrame({"Net_demand": demand_data})
+            df = pd.DataFrame({"Demand": demand_data})
             data_frames.append(df)
         
         elif name == 'BESS':
-            BESS_ch = asset.assets_dictionary['Charging'].flows.value
-            # BESS_disch = asset.assets_dictionary['Discharging'].flows.value
-            df = pd.DataFrame({"BESS_Charging": BESS_ch})
+            bess_op = asset.assets_dictionary['Charging'].flows.value
+            bess_soc = asset.assets_dictionary['Storage'].flows.value
+            df = pd.DataFrame({"New_BESS_Op": bess_op})
+            df_2 = pd.DataFrame({"New_BESS_SoC": bess_soc})
             data_frames.append(df)
+            data_frames.append(df_2)
+            
+        elif name == 'BESS_Existing':
+            bess_op = asset.assets_dictionary['Charging'].flows.value
+            bess_soc = asset.assets_dictionary['Storage'].flows.value
+            df = pd.DataFrame({"BESS_Op": bess_op})
+            df_2 = pd.DataFrame({"BESS_SoC": bess_soc})
+            data_frames.append(df)
+            data_frames.append(df_2)
         
-        elif name in ['PP_CO2', 'PP_CO2_Existing']:
+        elif name == 'PP_CO2':
             pp_data = asset.flows.value
-            df = pd.DataFrame({"PP_total": pp_data})
+            df = pd.DataFrame({"PP_new": pp_data})
             data_frames.append(df)
         
-        elif name in ['RE_PV_Existing', 'RE_PV_Openfield_Lim']:
+        elif name == 'PP_CO2_Existing':
+            pp_data = asset.flows.value
+            df = pd.DataFrame({"PP_existing": pp_data})
+            data_frames.append(df)
+        
+        elif name == 'RE_PV_Openfield_Lim':
             pv_data = asset.get_plot_data()
-            df = pd.DataFrame({"PV_total": pv_data})
+            df = pd.DataFrame({"PV_new": pv_data})
+            data_frames.append(df)
+            
+        elif name == 'RE_PV_Existing':
+            pv_data = asset.get_plot_data()
+            df = pd.DataFrame({"PV_existing": pv_data})
             data_frames.append(df)
         
-        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
+        elif name == 'RE_WIND_Onshore_Lim':
             wind_data = asset.get_plot_data()
-            df = pd.DataFrame({"Wind_total": wind_data})
+            df = pd.DataFrame({"Wind_new": wind_data})
+            data_frames.append(df)
+            
+        elif name == 'RE_Wind_Existing':
+            wind_data = asset.get_plot_data()
+            df = pd.DataFrame({"Wind_existing": wind_data})
             data_frames.append(df)
 
     flows_df = pd.concat(data_frames, axis=1)
