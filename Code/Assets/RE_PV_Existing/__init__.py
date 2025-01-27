@@ -25,19 +25,14 @@ class RE_PV_Existing_Asset(Asset_STEVFNs):
     
     @staticmethod
     def cost_fun(flows, params):
-        return params["sizing_constant"] * flows
-    
-    @staticmethod
-    def conversion_fun_2(flows, params):
-        return params["existing_capacity"] - flows
+        return params["sizing_constant"] * cp.sum(flows)
     
     def __init__(self):
         super().__init__()
         self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
-        self.conversion_fun_params_2 = {"existing_capacity": cp.Parameter(nonneg=True)}
+
         return
         
-    
     def define_structure(self, asset_structure):
         self.asset_structure = asset_structure
         self.source_node_location = "NULL"
@@ -48,13 +43,17 @@ class RE_PV_Existing_Asset(Asset_STEVFNs):
                                            asset_structure["End_Time"], 
                                            self.period)
         self.number_of_edges = len(self.target_node_times)
-        self.gen_profile = cp.Parameter(shape = self.number_of_edges, nonneg=True)
-        self.flows = cp.Variable(nonneg = True)#size of RE asset
-        return
-    
-    def build_edges(self):
-        super().build_edges()
-        self.build_edge_2()
+        
+        # Get number of years in prediction horizon UPDATE: this does not get the 
+        # system_parameters file, has the default values stated in Network.py
+        self.prediction_horizon = int(self.network.system_parameters_df.loc["project_life", "value"] / 8760)
+        self.gen_profile = cp.Parameter(shape = (5 ,self.number_of_edges), nonneg=True)
+        
+        # Size of RE asset for each of the five years in testing prediction horizon.
+        # Needs to be generalized to array where shape is (prediction_horizon,) 
+        # and it gets the values from the existing_capacity matrix depending on
+        # scenario year being modelled in main
+        self.flows = cp.Parameter(shape=(5,), value=[1, 2, 3, 4, 5])
         return
     
     def build_edge(self, edge_number):
@@ -63,32 +62,14 @@ class RE_PV_Existing_Asset(Asset_STEVFNs):
         self.edges += [new_edge]
         new_edge.attach_target_node(self.network.extract_node(
             self.target_node_location, self.target_node_type, target_node_time))
-        new_edge.flow = self.flows * self.gen_profile[edge_number]
-        return
-    
-    def build_edge_2(self):
-        source_node_type = "NULL"
-        source_node_location = self.source_node_location_2
-        source_node_time = 0
-        target_node_type = self.target_node_type_2
-        target_node_location = self.target_node_location_2
-        target_node_time = self.target_node_time_2
-        
-        new_edge = Edge_STEVFNs()
-        self.edges += [new_edge]
-        if source_node_type != "NULL":
-            new_edge.attach_source_node(self.network.extract_node(
-                source_node_location, source_node_type, source_node_time))
-        if target_node_type != "NULL":
-            new_edge.attach_target_node(self.network.extract_node(
-                target_node_location, target_node_type, target_node_time))
-        new_edge.flow = self.flows
-        new_edge.conversion_fun = self.conversion_fun_2
-        new_edge.conversion_fun_params = self.conversion_fun_params_2
+        for year_number in range(0, 5):
+            new_edge.flow = self.flows[year_number] * self.gen_profile[year_number][edge_number]
         return
     
     def get_plot_data(self):
-        return self.flows.value * self.gen_profile.value
+        '''This needs updating to broadcast the gen_profile and capacities properly '''
+        # return self.flows.value * self.gen_profile.value
+        return self.gen_profile.T.value * self.flows.value
     
     def _update_sizing_constant(self):
         N = np.ceil(self.network.system_parameters_df.loc["project_life", "value"]/self.parameters_df["lifespan"])
@@ -99,8 +80,6 @@ class RE_PV_Existing_Asset(Asset_STEVFNs):
     
     def _update_parameters(self):
         super()._update_parameters()
-        for parameter_name, parameter in self.conversion_fun_params_2.items():
-            parameter.value = self.parameters_df[parameter_name]
         #Update cost parameters based on NPV#
         self._update_sizing_constant()
         self._load_RE_profile()
@@ -136,11 +115,22 @@ class RE_PV_Existing_Asset(Asset_STEVFNs):
             new_loc_0 = int(set_size * counter1)
             new_loc_1 = int(new_loc_0 + set_size)
             new_profile[new_loc_0 : new_loc_1] = full_profile[old_loc_0 : old_loc_1]
-        self.gen_profile.value = new_profile[:self.number_of_edges]
+            
+        # self.gen_profile.value = new_profile[:self.number_of_edges]
+        
+        '''Below testing for mpc updates for a set of years in prediction horizon'''
+        # Get the profile added the same number of times as prediction_horizon to
+        # multiply by the flows array. Currently hard coded for five 
+        self.gen_profile.value = np.tile(new_profile[:self.number_of_edges], (5, 1))
         return
+    
+    def size(self):
+        # The sizes of Existing assets is pre-defined by the previously installed and their lifetimes
+        return self.flows
     
     def get_asset_sizes(self):
         # Returns the size of the asset as a dict #
+        # For time dependent pathways, needs size that is pre-defined
         asset_size = self.size()
         asset_identity = self.asset_name + r"_" + self.parameters_df["RE_type"] + r"_location_" + str(self.target_node_location)
         return {asset_identity: asset_size}

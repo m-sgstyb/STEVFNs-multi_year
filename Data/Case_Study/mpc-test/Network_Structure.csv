@@ -1,0 +1,5 @@
+﻿Asset_Number,Asset_Class,Location_1,Location_2,Start_Time,End_Time,Period,Transport_Time
+0,RE_PV_Existing,0,0,0,730,1,0
+1,RE_PV_Openfield_Lim,0,0,0,730,1,0
+2,EL_Demand,0,0,0,730,1,0
+3,PP_CO2,0,0,0,730,1,0

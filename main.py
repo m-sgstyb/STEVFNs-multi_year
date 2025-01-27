@@ -22,7 +22,8 @@ from Code.Results import Results
 from Code.Results import get_new_input_params
 
 #### Define Input Files ####
-case_study_name = "MEX"
+case_study_name = "mpc-test"
+# case_study_name = "MEX"
 # case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 
@@ -113,49 +114,49 @@ for counter1 in range(len(scenario_folders_list)):
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
     # DPhil_Plotting.plot_asset_sizes(my_network)
     scenario = str(my_network.scenario_name)
-    DPhil_Plotting.plot_asset_sizes_stacked(my_network,
-                                            location_parameters_df,
-                                            save_path=os.path.join(results_folder, "asset_sizes", f"{scenario}.png"))
+    # DPhil_Plotting.plot_asset_sizes_stacked(my_network,
+    #                                         location_parameters_df,
+    #                                         save_path=os.path.join(results_folder, "asset_sizes", f"{scenario}.png"))
     
-    # Save results for asset flows and total data per scenario
-    results_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
-    results_rounded_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
+    # # Save results for asset flows and total data per scenario
+    # results_df = Results.get_total_data(my_network, location_parameters_df, asset_parameters_df)
+    # results_rounded_df = Results.get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df)
     
     
     
-    if counter1 == 0:
-        total_results = results_df
-        total_results_rounded = results_rounded_df
-    else:
-        # Concatenate next scenario's results into one dataframe
-        total_results = pd.concat([total_results, results_df], ignore_index=True)
-        total_results_rounded = pd.concat([total_results_rounded, results_rounded_df], ignore_index=True)
+    # if counter1 == 0:
+    #     total_results = results_df
+    #     total_results_rounded = results_rounded_df
+    # else:
+    #     # Concatenate next scenario's results into one dataframe
+    #     total_results = pd.concat([total_results, results_df], ignore_index=True)
+    #     total_results_rounded = pd.concat([total_results_rounded, results_rounded_df], ignore_index=True)
     
-    # This works for all PV existing in MEX case study, updates well. Will need to add a condition to meet
-    # Location column AND description column do be able to differenciate with other case studies
-    # pv_lim = 'RE_PV_Openfield_Lim'
-    # pv_existing = 'RE_PV_Existing'  
-    # get_new_input_params.update_existing_RE_capacity(my_network, pv_lim, pv_existing,
-    #                                 assets_folder, scenario_year)
+    # # This works for all PV existing in MEX case study, updates well. Will need to add a condition to meet
+    # # Location column AND description column do be able to differenciate with other case studies
+    # # pv_lim = 'RE_PV_Openfield_Lim'
+    # # pv_existing = 'RE_PV_Existing'  
+    # # get_new_input_params.update_existing_RE_capacity(my_network, pv_lim, pv_existing,
+    # #                                 assets_folder, scenario_year)
         
-    # flows_df = Results.export_aut_flows(my_network)
-    flows_df = Results.export_collab_flows(my_network, location_parameters_df)
+    # # flows_df = Results.export_aut_flows(my_network)
+    # flows_df = Results.export_collab_flows(my_network, location_parameters_df)
     
-    curtailment = Results.calculate_curtailment_aut(my_network)
-    # curtailment = Results.calculate_curtailment_collab(my_network, location_parameters_df)
+    # curtailment = Results.calculate_curtailment_aut(my_network)
+    # # curtailment = Results.calculate_curtailment_collab(my_network, location_parameters_df)
     
-    flows_filename = os.path.join(results_folder, f"flows_{my_network.scenario_name}.csv")
-    curtailment_filename = os.path.join(results_folder, f"curtailment_{my_network.scenario_name}.csv")
-    curtailment.to_csv(curtailment_filename, index=False, header=True)
-    flows_df.to_csv(flows_filename, index=False, header=True)
+    # flows_filename = os.path.join(results_folder, f"flows_{my_network.scenario_name}.csv")
+    # curtailment_filename = os.path.join(results_folder, f"curtailment_{my_network.scenario_name}.csv")
+    # curtailment.to_csv(curtailment_filename, index=False, header=True)
+    # flows_df.to_csv(flows_filename, index=False, header=True)
     
     
     
     
 
-# # Save total_data for all scenarios into a single csv file
-total_results.to_csv(results_filename, index=False, header=True)
-total_results_rounded.to_csv(rounded_results_filename, index=False, header=True)
+# # # Save total_data for all scenarios into a single csv file
+# total_results.to_csv(results_filename, index=False, header=True)
+# total_results_rounded.to_csv(rounded_results_filename, index=False, header=True)
 # Save flows into a separate file
 end_time = time.time()
 print("Time taken to build, update and solve:", end_time - start_time, "s")
