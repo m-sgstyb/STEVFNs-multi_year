@@ -167,7 +167,7 @@ def get_scenario_year(scenario_folder):
     Returns
     -------
     scenario_year : int
-        Value for the scenario year, e.g. 2030.
+        Value for the scenario year (start of control horizon), e.g. 2030.
 
     '''
     scenario_name = os.path.basename(scenario_folder)
@@ -192,7 +192,7 @@ def get_prev_existing_capacity(scenario_folder, assets_folder, tech_existing,
 
     Returns
     -------
-    None.
+    Start year of current scenario and previous existing capacity
 
     '''
     scenario_year = get_scenario_year(scenario_folder)
@@ -237,7 +237,7 @@ def update_RE_installable_cap(my_network, case_study_folder, scenario_folder, te
 
     Returns
     -------
-    None.
+    Updated CSV file with calculated min and max capacity bounds
 
     '''
     case_study_name = os.path.basename(case_study_folder)
