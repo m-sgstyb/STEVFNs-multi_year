@@ -118,6 +118,7 @@ def fit_s_curves(case_study_folder, tech_lim, assets_folder,
                                                                 tech_lim,
                                                                 assets_folder)
     years = data['year'].values
+    # Identify limited technology for either wind or solar
     if tech_lim[0:5] == 'RE_PV':
         capacities = data['pv_installed_capacity_GW'].values
     elif tech_lim[0:5] == 'RE_WI':
