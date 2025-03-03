@@ -26,7 +26,7 @@ class Asset_STEVFNs:
         self.cost_fun_params = dict()
         self.conversion_fun_params = dict()
         return
-    
+     
     def build_cost(self):
         self.cost = self.cost_fun(self.flows, self.cost_fun_params)
         return
@@ -82,6 +82,18 @@ class Asset_STEVFNs:
         parameters_filename = os.path.join(self.parameters_folder, "parameters.csv")
         self.parameters_df = pd.read_csv(parameters_filename).iloc[asset_type]
         return
+    
+    def _load_historic_capacity_params(self):
+        ## NEW FUNCTION
+        """Loads historic capacity parameters if the file exists."""
+        country = self.parameters_df["location_name"]
+        historic_filename = os.path.join(self.parameters_folder, "capacities", f"{country}_capacity_params.csv")
+        if os.path.exists(historic_filename):
+            self.historic_capacity_df = pd.read_csv(historic_filename)
+        else:
+            self.historic_capacity_df = None  # Optionally set to None to indicate no file
+        return
+
     
     def _update_parameters(self):
         for parameter_name, parameter in self.cost_fun_params.items():
