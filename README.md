@@ -1,6 +1,7 @@
 # STEVFNs-DPhil-MSB
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://choosealicense.com/licenses/mit/)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/y/m-sgstyb/STEVFNs-DPhil-MSB)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/m-sgstyb/STEVFNs-DPhil-MSB?color=green)
+![GitHub repo size](https://img.shields.io/github/repo-size/m-sgstyb/STEVFNs-DPhil-MSB?color=orange)
 
 
 This repository contains an application of the Space-Time Energy Vector Flow Networks [(STEVFNs)](https://github.com/OmNomNomzzz/STEVFNs) model, adapted for the case study in my doctoral thesis.
