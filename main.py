@@ -22,7 +22,8 @@ from Code.Results import Results
 from Code.Results import get_new_input_params
 
 #### Define Input Files ####
-case_study_name = "mpc-test"
+# case_study_name = "mpc-test"
+case_study_name = "test_RE_WIND_multi_year"
 # case_study_name = "MEX"
 # case_study_name = "CHL"
 # case_study_name = "USA_WECC"
@@ -74,7 +75,7 @@ total_df_1 = pd.DataFrame()
 for counter1 in range(len(scenario_folders_list)):
 # for counter1 in range(1):
     # Read Input Files ###
-    scenario_folder = scenario_folders_list[counter1]
+    scenario_folder = scenario_folders_list[-1-counter1]
     # Get year value out of the scenario path to replace results later
     scenario_year = scenario_folder[-4:] # STRING of scenario year
     
@@ -113,7 +114,7 @@ for counter1 in range(len(scenario_folders_list)):
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
     # DPhil_Plotting.plot_asset_sizes(my_network)
-    scenario = str(my_network.scenario_name)
+    # scenario = str(my_network.scenario_name)
     # DPhil_Plotting.plot_asset_sizes_stacked(my_network,
     #                                         location_parameters_df,
     #                                         save_path=os.path.join(results_folder, "asset_sizes", f"{scenario}.png"))
