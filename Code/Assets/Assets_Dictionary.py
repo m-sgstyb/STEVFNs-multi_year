@@ -23,9 +23,9 @@ from .CO2_Budget import CO2_Budget_Asset
 from .PP_CO2 import PP_CO2_Asset
 from .PP_CO2_Existing import PP_CO2_Existing_Asset
 from .RE_PV_Openfield_Lim import RE_PV_Openfield_Lim_Asset
-from .RE_PV_Existing import RE_PV_Existing_Asset
+from .RE_PV_MY import RE_PV_MY_Asset
 from .RE_WIND_Onshore_Lim import RE_WIND_Onshore_Lim_Asset
-from .RE_WIND_Existing import RE_WIND_Existing_Asset
+from .RE_WIND_MY import RE_WIND_MY_Asset
 from .PP_NGS_CCGT_CO2 import PP_NGS_CCGT_CO2_Asset
 from .PP_NGS_SCGT_CO2 import PP_NGS_SCGT_CO2_Asset
 from .PP_COAL_CO2 import PP_COAL_CO2_Asset
@@ -49,9 +49,9 @@ ASSET_DICT = {EL_Demand_Asset.asset_name: EL_Demand_Asset,
               PP_CO2_Asset.asset_name: PP_CO2_Asset,
               PP_CO2_Existing_Asset.asset_name: PP_CO2_Existing_Asset,
               RE_PV_Openfield_Lim_Asset.asset_name: RE_PV_Openfield_Lim_Asset,
-              RE_PV_Existing_Asset().asset_name: RE_PV_Existing_Asset,
+              RE_PV_MY_Asset.asset_name: RE_PV_MY_Asset,
               RE_WIND_Onshore_Lim_Asset.asset_name: RE_WIND_Onshore_Lim_Asset,
-              RE_WIND_Existing_Asset.asset_name: RE_WIND_Existing_Asset,
+              RE_WIND_MY_Asset.asset_name: RE_WIND_MY_Asset,
               PP_NGS_CCGT_CO2_Asset.asset_name: PP_NGS_CCGT_CO2_Asset,
               PP_NGS_SCGT_CO2_Asset.asset_name: PP_NGS_SCGT_CO2_Asset,
               PP_COAL_CO2_Asset.asset_name: PP_COAL_CO2_Asset,

@@ -4,7 +4,6 @@
 Created on Mon Nov  1 16:36:27 2021
 
 @author: aniqahsan
-@contributor: Mónica Sagastuy Breña (c) 2024-2025
 """
 
 import os
@@ -15,13 +14,15 @@ from ..Base_Assets import Asset_STEVFNs
 from ...Network import Edge_STEVFNs
 
 
-class RE_WIND_Existing_Asset(Asset_STEVFNs):
-    """Class of Renewable Energy Sources """
-    asset_name = "RE_WIND_Existing"
+class RE_PV_MY_Asset(Asset_STEVFNs):
+    """Class of Existing Renewable Energy Sources for multi-year handling"""
+    asset_name = "RE_PV_MY"
     target_node_type = "EL"
+    source_node_type_2 = "NULL"
+    target_node_type_2 = "RE_PV_MY"
     period = 1
     transport_time = 0
-    
+    target_node_time_2 = 0
     
     @staticmethod
     def cost_fun(flows, params):
@@ -217,9 +218,9 @@ class RE_WIND_Existing_Asset(Asset_STEVFNs):
         if self.historic_capacity_df is None:
             raise ValueError("Error: historic_capacity_df is None. It must be loaded before building the capacities matrix.")
     
-        self.historic_capacity_df = self.historic_capacity_df[['year', 'wind_installed_capacity_GW']].dropna()
+        self.historic_capacity_df = self.historic_capacity_df[['year', 'pv_installed_capacity_GW']].dropna()
         # Calculate annual installed capacity
-        self.historic_capacity_df['annual_installed_capacity'] = self.historic_capacity_df['wind_installed_capacity_GW'].diff().fillna(0)
+        self.historic_capacity_df['annual_installed_capacity'] = self.historic_capacity_df['pv_installed_capacity_GW'].diff().fillna(0)
         
         # Initialize an empty DataFrame with the Year column
         self.asset_lifetime = int(self.parameters_df["lifespan"] / 8760)
