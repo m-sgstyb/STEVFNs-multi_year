@@ -1,0 +1,6 @@
+parameter,value,unit
+timestep,1,h
+discount_rate,0.05,unitless
+project_life,219000,timestep
+control_horizon,219000,timestep
+scenario_start,2025,year

@@ -23,8 +23,9 @@ from Code.Results import get_new_input_params
 
 #### Define Input Files ####
 # case_study_name = "mpc-test"
-case_study_name = "test_RE_WIND_multi_year"
+# case_study_name = "test_RE_WIND_multi_year"
 # case_study_name = "MEX"
+case_study_name = "MEX_30y_MY"
 # case_study_name = "CHL"
 # case_study_name = "USA_WECC"
 

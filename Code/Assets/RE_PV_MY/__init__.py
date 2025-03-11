@@ -4,6 +4,7 @@
 Created on Mon Nov  1 16:36:27 2021
 
 @author: aniqahsan
+@contributor: Mónica Sagastuy Breña (c) 2024-2025
 """
 
 import os
@@ -54,7 +55,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.flows = cp.Variable(shape=(self.num_years,), nonneg=True) # New capacities to install per year
         # self.existing_capacity = cp.Parameter(shape=(self.num_years,),
         #                                       nonneg=True,)
-        self.final_capacity = None # javier
+        self.final_capacity = None
         self.cost_fun_params = {"sizing_constant": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True)}
         return
@@ -89,15 +90,13 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         index_number = 0 # to track when year changes
         edge_counter = 0
         for edge in self.edges:
+            # check what year the edge belongs to
             if edge_counter >= self.year_change_indices[index_number]:
-                if index_number < self.num_years-1:
-                    if edge_counter == self.year_change_indices[index_number+1]:
-                        index_number += 1
+                if index_number < self.num_years-1: # ensure it only does it for the number of years modeled
+                    if edge_counter == self.year_change_indices[index_number+1]: # identifies when edge belongs to following year
+                        index_number += 1 
                 
-                self.existing_flows = self.final_capacity[index_number] * self.gen_profile[edge_counter]
-                # self.existing_flows = cp.CallbackParam(callback=lambda:
-                #                                   self.final_capacity[index_number].value * self.gen_profile[edge_counter].value)
-                edge.flow = self.flows[index_number] * self.gen_profile[edge_counter] + self.existing_flows
+                edge.flow = self.final_capacity[index_number] * self.gen_profile[edge_counter]
                 edge_counter += 1
         return
     
