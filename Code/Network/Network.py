@@ -4,6 +4,7 @@
 Created on Thu Nov  4 10:19:15 2021
 
 @author: aniqahsan
+@contributor: Mónica Sagastuy-Breña 2025
 """
 
 ### Import Packages ###
@@ -23,20 +24,14 @@ class Network_STEVFNs:
         self.constraints = []
         self.nodes_df = pd.Series([], index = pd.MultiIndex.from_tuples([], names = ["location", "type", "time"]), dtype = "O")
         self.base_folder = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        # EDITED: Added system parameter to establish start year in multi-year modeling with MPC
         self.system_parameters_df = pd.DataFrame({
-            "parameter": ["timestep", "discount_rate", "project_life"],
-            "value" : [1, 0.05, 262800],#default values are [1hour, 5%, 30years]
-            "unit" : ["h", "unitless", "timestep"]}).set_index("parameter")
+            "parameter": ["timestep", "discount_rate", "interest_rate", "project_life", "control_horizon","scenario_start"],
+            "value" : [1, 0.05, 0.03, 43800, 43800, 2025],# default values are [1hour, 5%, 30years, 1 year control, start at 2025]
+            "unit" : ["h", "unitless", "unitless", "timestep", "timestep", "year"]}).set_index("parameter")
         self.system_structure_properties = dict({
             "simulated_timesteps" : 0,})
         self.scenario_name = ""
-        return
-    
-    def set_usage_factor(self, discount_rate, timesteps):
-        discount_factor = 1 / (1+discount_rate)
-        NPV_factor = (1-discount_factor**30)/(1-discount_factor)#Assume the asset will be used for 30 years
-        yearly_factor = 365.0*24 / timesteps
-        self.usage_factor = NPV_factor * yearly_factor
         return
     
     def generate_node(self, node_location, node_type, node_time):
@@ -107,8 +102,12 @@ class Network_STEVFNs:
         return
     
     def solve_problem(self):
-        self.problem.solve(solver = cp.CLARABEL, max_iter=10000)
-        # self.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=1000)
+        # self.problem.solve()
+        # self.problem.solve(warm_start=True)# This can sometimes use OSQP solver that sometimes gives errors.
+        self.problem.solve(solver = cp.CLARABEL, max_iter=1000)
+        # self.problem.solve(solver = cp.OSQP, warm_start=True)
+        # self.problem.solve(solver = cp.CVXOPT, warm_start=True)
+        # self.problem.solve(solver = cp.SCS, warm_start=True)
         return
     
     def satisfy_net_loads(self):
@@ -131,8 +130,7 @@ class Network_STEVFNs:
         #Generate Assets#
         for counter1 in range(len(network_structure_df)):
             self.generate_asset(network_structure_df.iloc[counter1])
-        #Build Problem#
-        self.set_usage_factor(discount_rate = 0.05, timesteps = network_structure_df["End_Time"].max())
+        #Add properties, costs, constraints, objective and build problem#
         self.build_problem()
         return
     
