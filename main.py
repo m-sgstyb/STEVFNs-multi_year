@@ -19,7 +19,7 @@ from Code.Results import Results
 
 
 #### Define Input Files ####
-case_study_name = "test_multi_year"
+case_study_name = "test_multi_year_2"
 
 
 base_folder = os.path.dirname(__file__)
@@ -40,7 +40,6 @@ start_time = time.time()
 
 my_network = Network_STEVFNs()
 my_network.build(network_structure_df)
-
 
 end_time = time.time()
 print("Time taken to build network = ", end_time - start_time, "s")
@@ -80,8 +79,6 @@ for counter1 in range(len(scenario_folders_list)):
     # my_network.solve_problem()
     my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000, ignore_dpp=False, verbose=False)
     
-    # my_network.problem.solve(solver = cp.ECOS, warm_start=True, max_iters=10000, feastol=1e-5, reltol=1e-5, abstol=1e-5, ignore_dpp=True, verbose=False)
-    # my_network.problem.solve(solver = cp.SCS, warm_start=True, max_iters=10000, ignore_dpp=True, verbose=False)
     end_time = time.time()
 
     
@@ -100,12 +97,13 @@ for counter1 in range(len(scenario_folders_list)):
        
 demand_flows = my_network.assets[2].get_plot_data()
 pp_flows = my_network.assets[1].get_plot_data()
-re_flows = my_network.assets[3].get_plot_data()
-cf_profile = my_network.assets[3].gen_profile.value
+# re_flows = my_network.assets[3].get_plot_data()
+# cf_profile = my_network.assets[3].gen_profile.value
 
 
 # Combine the arrays as columns
-combined_flows = np.column_stack((demand_flows, pp_flows, re_flows, cf_profile))
+# combined_flows = np.column_stack((demand_flows, pp_flows, re_flows, cf_profile))
+combined_flows = np.column_stack((demand_flows, pp_flows))
 
 # Define header names for columns (optional)
 header = "demand_flows,pp_flows,re_flows,cf_profile"

@@ -33,7 +33,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     @staticmethod
     def conversion_fun_2(flows, params):
         CO2_emissions_factor = params["CO2_emissions_factor"]
-        return -CO2_emissions_factor * flows
+        return CO2_emissions_factor * flows
     
     @staticmethod
     def conversion_fun_3(flows, params):
@@ -82,6 +82,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         target_node_time = self.target_node_time_2
         
         new_edge = Edge_STEVFNs()
+        new_edge.exclude_from_balance = True  # ✅ This prevents double counting in the node
         self.edges += [new_edge]
         if source_node_type != "NULL":
             new_edge.attach_source_node(self.network.extract_node(
@@ -148,13 +149,6 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.cost_fun_params["usage_constant_1"].value = (self.cost_fun_params["usage_constant_1"].value * 
                                                         NPV_factor * simulation_factor)
         return
-    
-    def _update_co2_emissions_factor(self):
-        simulation_factor = 8760/self.network.system_structure_properties["simulated_timesteps"]
-        N = np.ceil(self.network.system_parameters_df.loc["project_life", "value"]/8760)
-        self.conversion_fun_params_2["CO2_emissions_factor"].value = (self.conversion_fun_params_2["CO2_emissions_factor"].value * 
-                                                                      simulation_factor * N)
-        return
         
     def _update_parameters(self):
         super()._update_parameters()
@@ -163,29 +157,24 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         for parameter_name, parameter in self.conversion_fun_params_3.items():
             parameter.value = self.parameters_df[parameter_name]
         #Update cost parameters based on NPV#
-        # self._update_sizing_constant()
         self._update_usage_constants()
-        self._update_co2_emissions_factor()
         return
     
-    def size(self):
-        #Function gets peak generation from powerplant at each year does not work yet
-        size_array = []
-        for index in range(1,len(self.year_change_indices)):
-            if index == 1:
-                size = cp.max(self.flows[:,self.year_change_indices[index]].value)
-                print(size)
-            elif index > 1 & index < len(self.year_change_indices):
-                # start = self.year_change_indices[index-1] + 1
-                # end = 
-                # size = cp.max(self.flows[self.year_change_indices[index-1] + 1:self.year_change_indices[index]].value)
-                print(size)
-            else:
-                size = cp.max(self.flows[self.year_change_indices[index] + 1,:].value)
-                print(size)
-            
-            size_array.append(size)
-        return size_array
+    def peak_generation_per_year(self):
+        # Method gets the peak generation at each year
+        year_change_indices = self._get_year_change_indices()
+        peak_gen_list = []
+    
+        # Add the end of the flow array to the list so we can loop cleanly
+        year_change_indices.append(self.number_of_edges)
+    
+        for i in range(len(year_change_indices) - 1):
+            start = year_change_indices[i]
+            end = year_change_indices[i + 1]
+            peak_gen = cp.max(self.flows[start:end].value)
+            peak_gen_list.append(peak_gen.value)
+
+        return np.array(peak_gen_list)
     
     def get_asset_sizes(self):
         # Returns the size of the asset as a dict #
