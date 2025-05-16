@@ -8,6 +8,8 @@ Created on Fri Nov 29 18:43:22 2024
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import os
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
 from Code.Results import get_new_input_params
@@ -338,3 +340,178 @@ def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None)
     
     return 
 
+def plot_yearly_flows(network, output_folder):
+    """
+    Creates a plot per year showing flows from all assets for that year.
+    Each technology keeps the same color across plots.
+    """
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # Step 1: Collect all asset flow chunks
+    asset_flows_by_year = {}
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flow_chunks"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flow_chunks()
+            asset_flows_by_year[asset.asset_name] = yearly_chunks
+        except Exception as e:
+            print(f"[Skip] {asset.asset_name}: {e}")
+            continue
+
+    # Step 2: Determine number of years and assign colors
+    asset_names = list(asset_flows_by_year.keys())
+    num_years = max(len(chunks) for chunks in asset_flows_by_year.values())
+    color_map = cm.get_cmap("tab10", len(asset_names))
+    color_dict = {name: color_map(i) for i, name in enumerate(asset_names)}
+
+    # Step 3: Plot per year
+    for year in range(num_years):
+        plt.figure(figsize=(12, 6))
+        for asset_name, chunks in asset_flows_by_year.items():
+            if year < len(chunks):
+                plt.plot(chunks[year], label=asset_name, color=color_dict[asset_name])
+        plt.title(f"Year {year + 1} - Hourly Flows")
+        plt.xlabel("Hour")
+        plt.ylabel("Flow")
+        plt.legend()
+        plt.tight_layout()
+        plt.grid(True)
+        plt.savefig(os.path.join(output_folder, f"flows_year_{year + 1}.png"))
+        plt.close()
+    
+    print(f"[✓] Plots saved to folder: {output_folder}")
+    
+    
+def plot_yearly_flows_stacked(network, output_folder):
+
+    os.makedirs(output_folder, exist_ok=True)
+    
+    tech_order = ["pp", "wind", "pv"]
+    tech_colors = {"pp": "#1f77b4", "wind": "#2ca02c", "pv": "#ff7f0e"}
+    demand_color = "red"
+    
+    # Collect flows by tech and demand by year
+    tech_flows_by_year = {tech: [] for tech in tech_order}
+    demand_by_year = []
+    
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flows"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception:
+            continue
+    
+        name = asset.asset_name.lower()
+        if "demand" in name:
+            demand_by_year = yearly_chunks
+        else:
+            for tech in tech_order:
+                if tech in name:
+                    tech_flows_by_year[tech].append(yearly_chunks)
+                    break
+    
+    num_years = len(demand_by_year)
+    
+    for year in range(num_years):
+        demand = demand_by_year[year]
+        x = np.arange(len(demand))
+        bottom = np.zeros_like(demand)
+    
+        plt.figure(figsize=(14, 6))
+    
+        for tech in tech_order:
+            flows_list = tech_flows_by_year[tech]
+            tech_total = np.zeros_like(demand)
+            
+            # Sum all flows for this tech for the given year
+            for flows in flows_list:
+                if year < len(flows):
+                    tech_total += flows[year]
+    
+            top = bottom + tech_total
+            
+            # Below demand is the part where top is <= demand
+            # Above demand is the part where top > demand
+            below_fill = np.minimum(top, demand)
+            above_fill = top - np.maximum(demand, bottom)
+    
+            # Fill below demand solid (between bottom and below_fill)
+            plt.fill_between(x, bottom, below_fill,
+                             color=tech_colors[tech],
+                             label=tech.capitalize(),
+                             alpha=1.0)
+    
+            # Fill above demand semi-transparent (between max(bottom, demand) and top)
+            plt.fill_between(x, np.maximum(bottom, demand), top,
+                             where=(top > demand),
+                             color=tech_colors[tech],
+                             alpha=0.3)
+    
+            bottom = top
+    
+        # Demand line
+        plt.plot(x, demand, color=demand_color, label="Demand",
+                 linestyle="--", linewidth=1.5)
+    
+        plt.title(f"Stacked Generation vs Demand – Year {year + 1}")
+        plt.xlabel("Hour")
+        plt.ylabel("Power Flow")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"))
+        plt.close()
+    
+    print(f"[✓] Stacked plots saved to: {output_folder}")
+    
+def plot_stacked_generation(year_flows_dict, demand_flow, year=1):
+    tech_order = ["PP", "wind", "pv"]
+    colors = {"PP": "royalblue", "wind": "forestgreen", "pv": "orange"}
+    labels = {"PP": "Fossil", "wind": "Wind", "pv": "PV"}
+
+    n = len(demand_flow)
+    demand = np.array(demand_flow)
+    x = np.arange(n)
+
+    # Initialize arrays
+    bottoms = np.zeros(n)
+    tech_filled = {}
+
+    # Compute cumulative stack and split below/above demand
+    for tech in tech_order:
+        total = np.zeros(n)
+        for arr in year_flows_dict.get(tech, []):
+            total += np.array(arr)
+        top = bottoms + total
+        # BELOW demand: solid fill
+        below = np.minimum(top, demand)
+        tech_filled[tech] = {"below": below - bottoms, "above": top - np.maximum(demand, bottoms)}
+        bottoms = top
+
+    # Plot solid fill (below demand)
+    bottoms = np.zeros(n)
+    for tech in tech_order:
+        below = tech_filled[tech]["below"]
+        plt.fill_between(x, bottoms, bottoms + below,
+                         label=labels[tech], color=colors[tech], alpha=1.0)
+        bottoms += below
+
+    # Plot semi-transparent (above demand)
+    bottoms = np.maximum(bottoms, demand)
+    for tech in tech_order:
+        above = tech_filled[tech]["above"]
+        plt.fill_between(x, bottoms, bottoms + above,
+                         color=colors[tech], alpha=0.3)
+        bottoms += above
+
+    # Plot demand
+    plt.plot(demand, label="Demand", color="red", linestyle="--", linewidth=1.5)
+    plt.xlabel("Hour")
+    plt.ylabel("Power Flow")
+    plt.title(f"Stacked Generation vs Demand – Year {year}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()

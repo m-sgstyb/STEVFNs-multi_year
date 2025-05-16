@@ -11,12 +11,13 @@ import numpy as np
 import time
 import os
 import cvxpy as cp
+from collections import defaultdict
+import matplotlib.pyplot as plt
 
 
 from Code.Network.Network import Network_STEVFNs
 from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
-
 
 #### Define Input Files ####
 case_study_name = "test_multi_year_2"
@@ -94,26 +95,10 @@ for counter1 in range(len(scenario_folders_list)):
     # DPhil_Plotting.plot_asset_sizes(my_network)
     # DPhil_Plotting.plot_asset_costs(my_network)
     
-       
-demand_flows = my_network.assets[2].get_plot_data()
-pp_flows = my_network.assets[1].get_plot_data()
-# re_flows = my_network.assets[3].get_plot_data()
-# cf_profile = my_network.assets[3].gen_profile.value
-
-
-# Combine the arrays as columns
-# combined_flows = np.column_stack((demand_flows, pp_flows, re_flows, cf_profile))
-combined_flows = np.column_stack((demand_flows, pp_flows))
-
-# Define header names for columns (optional)
-header = "demand_flows,pp_flows,re_flows,cf_profile"
-
-# Save to a single CSV file
-np.savetxt(
-    os.path.join(case_study_folder, "all_flows.csv"),
-    combined_flows,
-    delimiter=",",
-    header=header,
-    comments=''  # Avoids '#' at the beginning of the header line
-)
    
+yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
+Results.save_yearly_flows_to_csv(my_network, yearly_path)
+
+DPhil_Plotting.plot_yearly_flows(my_network, case_study_folder)
+DPhil_Plotting.plot_yearly_flows_stacked(my_network, case_study_folder)
+

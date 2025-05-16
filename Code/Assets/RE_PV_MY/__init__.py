@@ -425,3 +425,30 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         asset_size = self.size()
         asset_identity = self.asset_name + r"_" + self.parameters_df["RE_type"] + r"_location_" + str(self.target_node_location)
         return {asset_identity: asset_size}
+    
+    def get_yearly_flows(self):
+        """
+        Returns a list of flow slices split by each year using year_change_indices.
+        """
+        # Ensure indices are available
+        if not hasattr(self, "year_change_indices"):
+            if hasattr(self, "_get_year_change_indices"):
+                self._get_year_change_indices()
+            else:
+                raise AttributeError("Asset has no year_change_indices or method to compute them.")
+                
+        flows_full = self.get_plot_data()
+    
+        # Guard against None or unexpected shape
+        if flows_full is None:
+            raise ValueError("Flow values not assigned yet.")
+        
+        if not isinstance(flows_full, np.ndarray):
+            flows_full = np.array(flows_full)
+    
+        # Final slicing using year_change_indices
+        year_indices = list(self.year_change_indices) + [len(flows_full)]
+        yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
+        
+        return yearly_flows
+    

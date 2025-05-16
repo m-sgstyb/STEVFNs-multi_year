@@ -634,5 +634,40 @@ def calculate_curtailment_collab(my_network, location_parameters_df):
     return curtailment_df
 
 
+def save_yearly_flows_to_csv(network, output_path):
+    """
+    Saves all asset flows split by year into a CSV file.
+    Each column is labeled as assetname_yN.
+    Handles different year lengths by padding with NaN.
+    """
+    flow_data = {}
+    
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flow_chunks"):
+            continue  # Skip assets without flow chunk method
 
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception as e:
+            print(f"[Skip] {asset.asset_name}: {e}")
+            continue
+
+        for year_idx, flow_array in enumerate(yearly_chunks):
+            col_name = f"{asset.asset_name}_y{year_idx+1}"
+            flow_data[col_name] = np.array(flow_array).flatten()
+
+    # Determine max column length for padding
+    max_len = max(len(arr) for arr in flow_data.values())
+
+    # Pad all arrays with np.nan to equal length
+    for key in flow_data:
+        padded = np.full(max_len, np.nan)
+        padded[:len(flow_data[key])] = flow_data[key]
+        flow_data[key] = padded
+
+    # Create DataFrame and save
+    df = pd.DataFrame(flow_data)
+    df.to_csv(output_path, index=False)
+    print(f"[✓] Yearly flows saved to {output_path}")
+    
 
