@@ -1,0 +1,6 @@
+Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,existing_capacity,existing_capacity_unit,max_rate_of_adoption,max_rate_unit,location_name,description,minimum_size,maximum_size,note
+0,"1.05,1.045,1.04459,1.0439,1.0426",G$/GWp,175200,h,WINDOUT,24,0,6.995,GWp,13.09,GWp/year,MX,2020,"0,0,0,0,0","130,100,100,70,180",five_years
+1,"1.05,1.045,1.04459,1.0439,1.0426,1.03998,1.038,1.026,1.025,1.02366,0.952,0.921,0.8992,0.851,0.836,0.82,0.76,0.714,0.651,0.592,0.488,0.456,0.449,0.426,0.413,0.4,0.3,0.25,0.2,0.1",G$/GWp,175200,h,WINDOUT,24,0,6.995,GWp,13.09,GWp/year,MX,2020,"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0","120,80,100,70,106,70,102,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100",30_years
+2,0,G$/GWp,175200,h,WINDOUT,24,0,57.31427274,GWp,13.09,GWp/year,MX,2040 results,,,
+3,0,G$/GWp,175200,h,WINDOUT,24,0,52.0516,GWp,15,GWp/year,US,,,,
+4,0,G$/GWp,175200,h,WINDOUT,24,0,2.34,GWp,10,GWp/year,CL,,,,
