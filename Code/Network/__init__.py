@@ -79,7 +79,16 @@ class Node_STEVFNs(__Node):
         self.curtailment = True
         self.net_output_flows = cp.Constant(0)
         self.constraints = []
-        return
+        # ----- ADDING THIS TO ACCESS NODE INFO -----#
+        self.node_type = None  # optionally track type
+        self.location = None   # optionally track location
+
+    def __repr__(self):
+        return (f"<Node_STEVFNs type={self.node_type} "
+                f"location={self.location} "
+                f"inputs={len(self.input_edges)} "
+                f"outputs={len(self.output_edges)}>")
+        # ----- END OF EDIT FOR NODE INFO -----#
     
     def build_constraints(self):
         total_output_flows = self.calculate_total_output_flows()

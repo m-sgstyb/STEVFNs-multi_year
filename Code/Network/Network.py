@@ -36,11 +36,23 @@ class Network_STEVFNs:
     
     def generate_node(self, node_location, node_type, node_time):
         new_node = Node_STEVFNs()
-        node_df = pd.Series([new_node], 
-                            index = pd.MultiIndex.from_tuples([(node_location, node_type, node_time)], 
-                                    names = ["location", "type", "time"]))
+        
+        #------NEW: Set human-readable attributes for inspection/debugging --- #
+        new_node.location = node_location
+        new_node.node_type = node_type
+        new_node.node_time = node_time
+        #----- END NEW ------------------ #
+    
+        node_df = pd.Series(
+            [new_node],
+            index=pd.MultiIndex.from_tuples(
+                [(node_location, node_type, node_time)],
+                names=["location", "type", "time"]
+            )
+        )
         self.nodes_df = pd.concat([self.nodes_df, node_df])
         return
+
     
     def extract_node(self, node_location, node_type, node_time):
         if not((node_location, node_type, node_time) in self.nodes_df.index):
