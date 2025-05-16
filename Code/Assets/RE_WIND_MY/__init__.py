@@ -4,7 +4,8 @@
 Created on Mon Nov  1 16:36:27 2021
 
 @author: aniqahsan
-@contributor: Mónica Sagastuy Breña (c) 2024-2025
+Based on RE_WIND_Asset by:
+@author: aniqahsan
 """
 
 import os
@@ -17,7 +18,7 @@ from ...Network import Edge_STEVFNs
 
 
 class RE_WIND_MY_Asset(Asset_STEVFNs):
-    """Class of Renewable Energy Sources """
+    """Class of Renewable Energy Sources for multi-year adaptation"""
     asset_name = "RE_WIND_MY"
     target_node_type = "EL"
     

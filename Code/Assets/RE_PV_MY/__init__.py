@@ -263,7 +263,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         profile_folder = os.path.join(self.parameters_folder, "profiles", RE_TYPE, r"lat"+LAT)
         profile_filename = RE_TYPE + r"_lat" + LAT + r"_lon" + LON + r".csv"
         profile_filename = os.path.join(profile_folder, profile_filename)
-        full_profile = np.loadtxt(profile_filename)
+        with open(profile_filename, encoding='utf-8-sig') as f:
+            full_profile = np.loadtxt(f)
         set_size = self.parameters_df["set_size"]
         set_number = self.parameters_df["set_number"]
         n_sets = int(np.ceil(self.number_of_edges/set_size))

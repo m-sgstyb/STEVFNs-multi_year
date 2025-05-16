@@ -7,6 +7,7 @@ Created on Fri Nov  5 11:16:24 2021
 """
 
 from .EL_Demand import EL_Demand_Asset
+from .EL_Demand_MY import EL_Demand_MY_Asset
 from .HTH_Demand import HTH_Demand_Asset
 from .CG import CG_Asset
 from .EL_to_HTH import EL_to_HTH_Asset
@@ -38,6 +39,7 @@ from .FF_to_HTH import FF_to_HTH_Asset
 
 
 ASSET_DICT = {EL_Demand_Asset.asset_name: EL_Demand_Asset,
+              EL_Demand_MY_Asset.asset_name: EL_Demand_MY_Asset,
               HTH_Demand_Asset.asset_name: HTH_Demand_Asset,
               CG_Asset.asset_name: CG_Asset,
               EL_to_HTH_Asset.asset_name: EL_to_HTH_Asset,
