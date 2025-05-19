@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov  1 16:36:27 2021
+Created on Tue Dec 17 11:31:32 2024
 
-@author: aniqahsan
+@author: Mónica Sagastuy-Breña
 Based on RE_WIND_Asset by:
 @author: aniqahsan
 """

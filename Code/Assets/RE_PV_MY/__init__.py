@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov  1 16:36:27 2021
+Created on Mon May 19 11:54:47 2025
 
+@author: Mónica Sagastuy-Breña
+Based on PP_CO2_Asset by:
 @author: aniqahsan
-@contributor: Mónica Sagastuy Breña (c) 2024-2025
 """
 
 import os
@@ -452,3 +453,4 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         
         return yearly_flows
     
+

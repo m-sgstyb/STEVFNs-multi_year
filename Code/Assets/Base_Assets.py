@@ -4,6 +4,8 @@
 Created on Wed Nov  3 12:33:27 2021
 
 @author: aniqahsan
+Updated by:
+    @author: Mónica Sagastuy-Breña 2025
 """
 
 import cvxpy as cp
@@ -84,7 +86,7 @@ class Asset_STEVFNs:
         return
     
     def _load_historic_capacity_params(self):
-        ## NEW FUNCTION
+        ## NEW FUNCTION MSB
         """Loads historic capacity parameters if the file exists."""
         country = self.parameters_df["location_name"]
         historic_filename = os.path.join(self.parameters_folder, "capacities", f"{country}_capacity_params.csv")
@@ -146,7 +148,7 @@ class Asset_STEVFNs:
         return {asset_identity: asset_size}
     
     # ======== ADDED METHOD FOR RESULT ANALYSIS ===========#
-    def get_yearly_flow_chunks(self):
+    def get_yearly_flows(self):
         """
         Returns a list of flow slices split by each year using year_change_indices.
         Uses get_plot_data() if available (e.g. RE assets), otherwise self.flows.value.

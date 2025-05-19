@@ -35,22 +35,18 @@ class CO2_Budget_MY_Asset(Asset_STEVFNs):
         self.num_years = None  # set later
         self.flows = None
         self.conversion_fun_params = {
-            "maximum_budget": cp.Parameter(nonneg=True)
-        }
+            "maximum_budget": cp.Parameter(nonneg=True)}
         return
 
     def define_structure(self, asset_structure):
         self.source_node_location = 0
         self.target_node_location = 0
         self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
-
         # Set a dummy constant; this gets overwritten anyway
         self.flows = cp.Constant(np.zeros(self.num_years))
-
         # Correct shape for the annual limit
-        self.conversion_fun_params["maximum_budget"] = cp.Parameter(
-            shape=(self.num_years,), nonneg=True
-        )
+        self.conversion_fun_params["maximum_budget"] = cp.Parameter(shape=(self.num_years,),
+                                                                    nonneg=True)
         return
 
     def process_csv_values(self, values):

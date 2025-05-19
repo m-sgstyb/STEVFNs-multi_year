@@ -27,11 +27,6 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     period = 1
     transport_time = 0
     
-    # @staticmethod
-    # def cost_fun(flows, params):
-    #     usage_constant_1 = params["usage_constant_1"]
-    #     return usage_constant_1 * cp.sum(flows)
-    
     @staticmethod
     def cost_fun(flows, params):
         usage_constant_1 = params["usage_constant_1"]  # shape: (n_timesteps,)
@@ -82,34 +77,11 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.build_edge_3()
         return
     
-    # def build_edge_2(self, edge_number):
-    #     source_node_type = self.source_node_type
-    #     source_node_location = self.source_node_location
-    #     source_node_time = self.source_node_times[edge_number]
-    #     target_node_type = self.target_node_type_2
-    #     target_node_location = self.target_node_location_2
-    #     target_node_time = self.target_node_time_2
-        
-    #     new_edge = Edge_STEVFNs()
-    #     new_edge.exclude_from_balance = False # Don't need this line, need to remove flag at node
-    #     self.edges += [new_edge]
-    #     if source_node_type != "NULL":
-    #         new_edge.attach_source_node(self.network.extract_node(
-    #             source_node_location, source_node_type, source_node_time))
-    #     if target_node_type != "NULL":
-    #         new_edge.attach_target_node(self.network.extract_node(
-    #             target_node_location, target_node_type, target_node_time))
-    #     new_edge.flow = self.flows[edge_number]
-    #     new_edge.conversion_fun = self.conversion_fun_2
-    #     new_edge.conversion_fun_params = self.conversion_fun_params_2
-    #     return
-    
     def build_emissions_aggregate_edge(self):
         source_node_type = self.source_node_type
         source_node_location = self.source_node_location
-        source_node_time = 0  # dummy
-    
-        target_node_type = self.target_node_type_2  # e.g., "CO2_Budget"
+        source_node_time = 0
+        target_node_type = self.target_node_type_2
         target_node_location = self.target_node_location_2
         target_node_time = self.target_node_time_2
     
@@ -123,19 +95,16 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         if target_node_type != "NULL":
             new_edge.attach_target_node(
                 self.network.extract_node(target_node_location, target_node_type, target_node_time))
-    
         # Create yearly sums from self.flows
         year_indices = self._get_year_change_indices()
-        year_indices.append(self.number_of_edges)  # ensure coverage
+        year_indices.append(self.number_of_edges)  # ensure full coverage
     
         yearly_sums = []
         for start, end in zip(year_indices[:-1], year_indices[1:]):
             yearly_sums.append(cp.sum(self.flows[start:end]))
-    
         # Set the yearly profile (cvxpy Expression vector)
         new_edge.flow = cp.hstack(yearly_sums)
-    
-        # Apply CO2 emissions factor
+        # Apply CO2 emissions factor conversion wiht flows
         new_edge.conversion_fun = self.conversion_fun_2
         new_edge.conversion_fun_params = self.conversion_fun_params_2
         return
@@ -193,13 +162,13 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         Updates usage cost parameters to a full-length vector matching flow resolution.
         Supports scalar or yearly values, applies NPV and simulation scaling.
         """
-        # Step 1: Compute simulation and NPV adjustment
+        # Compute simulation length and NPV adjustment
         simulation_factor = 8760 / self.network.system_structure_properties["simulated_timesteps"]
         discount_rate = self.network.system_parameters_df.loc["discount_rate", "value"]
         project_life_hours = self.network.system_parameters_df.loc["project_life", "value"]
         num_years = int(np.ceil(project_life_hours / 8760))
     
-        # Step 2: Parse CSV-style input FIRST (before anything else)
+        # Parse CSV-style input first
         raw_input = self.parameters_df["usage_constant_1"]
         raw_costs = self.process_csv_values(raw_input)
     
@@ -208,18 +177,17 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         elif raw_costs.size != num_years:
             raise ValueError(f"Expected {num_years} yearly usage cost values, got {raw_costs.size}")
     
-        # Step 3: Apply NPV discounting and simulation scaling
+        # Apply NPV discounting and simulation scaling
         discount_factors = (1 / (1 + discount_rate)) ** np.arange(num_years)
         yearly_costs = raw_costs * discount_factors * simulation_factor
-    
-        # Step 4: Expand to full-length vector over number_of_edges
+        # Expand to full-length vector over number_of_edges to broadcast properly with flows
         year_indices = self._get_year_change_indices() + [self.number_of_edges]
         expanded_costs = np.zeros(self.number_of_edges)
     
         for i, (start, end) in enumerate(zip(year_indices[:-1], year_indices[1:])):
             expanded_costs[start:end] = yearly_costs[i]
     
-        # Step 5: Assign value to pre-defined Parameter
+        # Assign value to pre-defined Parameter for static cost_fun
         self.cost_fun_params["usage_constant_1"].value = expanded_costs
 
     
@@ -232,13 +200,11 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
 
         
     def _update_parameters(self):
-        # for parameter_name, parameter in self.cost_fun_params.items():
-        #     parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.parameters_df[parameter_name]
         for parameter_name, parameter in self.conversion_fun_params_3.items():
             parameter.value = self.parameters_df[parameter_name]
-        #Update cost parameters based on NPV#
+        #Update cost parameters based on NP, simulation sample, and expand for broadcasting asset cost#
         self._update_usage_constants()
         return
     
@@ -247,7 +213,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         year_change_indices = self._get_year_change_indices()
         peak_gen_list = []
     
-        # Add the end of the flow array to the list so we can loop cleanly
+        # Add the end of the flow array to the list to ensure complete range
         year_change_indices.append(self.number_of_edges)
     
         for i in range(len(year_change_indices) - 1):
@@ -299,5 +265,3 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         
         return yearly_flows
                 
-            
-        
