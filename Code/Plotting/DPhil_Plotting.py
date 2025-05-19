@@ -413,10 +413,10 @@ def plot_yearly_flows_stacked(network, output_folder):
                     break
     
     num_years = len(demand_by_year)
-    
     for year in range(num_years):
-        demand = demand_by_year[year]
+        demand = np.array(demand_by_year[year])
         x = np.arange(len(demand))
+        remaining_demand = demand.copy()
         bottom = np.zeros_like(demand)
     
         plt.figure(figsize=(14, 6))
@@ -424,32 +424,32 @@ def plot_yearly_flows_stacked(network, output_folder):
         for tech in tech_order:
             flows_list = tech_flows_by_year[tech]
             tech_total = np.zeros_like(demand)
-            
-            # Sum all flows for this tech for the given year
+    
             for flows in flows_list:
                 if year < len(flows):
-                    tech_total += flows[year]
+                    tech_total += np.array(flows[year])
     
-            top = bottom + tech_total
-            
-            # Below demand is the part where top is <= demand
-            # Above demand is the part where top > demand
-            below_fill = np.minimum(top, demand)
-            above_fill = top - np.maximum(demand, bottom)
+            # Split into used (up to remaining demand) and excess (above demand)
+            used = np.minimum(tech_total, remaining_demand)
+            excess = tech_total - used
     
-            # Fill below demand solid (between bottom and below_fill)
-            plt.fill_between(x, bottom, below_fill,
+            # Plot used part: solid fill
+            plt.fill_between(x, bottom, bottom + used,
                              color=tech_colors[tech],
                              label=tech.capitalize(),
-                             alpha=1.0)
+                             alpha=1.0,
+                             edgecolor='none')
     
-            # Fill above demand semi-transparent (between max(bottom, demand) and top)
-            plt.fill_between(x, np.maximum(bottom, demand), top,
-                             where=(top > demand),
+            # Plot excess part: transparent fill stacked on top
+            plt.fill_between(x, bottom + used, bottom + used + excess,
                              color=tech_colors[tech],
-                             alpha=0.3)
+                             alpha=0.3,
+                             edgecolor=tech_colors[tech])
     
-            bottom = top
+            # Update bottom and remaining demand
+            bottom += tech_total
+            remaining_demand -= used
+            remaining_demand = np.clip(remaining_demand, 0, None)
     
         # Demand line
         plt.plot(x, demand, color=demand_color, label="Demand",
@@ -463,6 +463,7 @@ def plot_yearly_flows_stacked(network, output_folder):
         plt.tight_layout()
         plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"))
         plt.close()
+
     
     print(f"[✓] Stacked plots saved to: {output_folder}")
     
