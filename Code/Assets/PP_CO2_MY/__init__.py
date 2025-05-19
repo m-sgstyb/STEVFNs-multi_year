@@ -27,10 +27,15 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     period = 1
     transport_time = 0
     
+    # @staticmethod
+    # def cost_fun(flows, params):
+    #     usage_constant_1 = params["usage_constant_1"]
+    #     return usage_constant_1 * cp.sum(flows)
+    
     @staticmethod
     def cost_fun(flows, params):
-        usage_constant_1 = params["usage_constant_1"]
-        return usage_constant_1 * cp.sum(flows)
+        usage_constant_1 = params["usage_constant_1"]  # shape: (n_timesteps,)
+        return cp.sum(cp.multiply(usage_constant_1, flows))  # scalar
     
     @staticmethod
     def conversion_fun_2(flows, params):
@@ -66,6 +71,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.number_of_edges = len(self.source_node_times)
         self.flows = cp.Variable(self.number_of_edges, nonneg = True)
         self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
+        self.cost_fun_params = {"usage_constant_1": cp.Parameter(shape=(self.number_of_edges,),nonneg=True),}
         return
         
     def build_edges(self):
@@ -132,7 +138,6 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         # Apply CO2 emissions factor
         new_edge.conversion_fun = self.conversion_fun_2
         new_edge.conversion_fun_params = self.conversion_fun_params_2
-    
         return
 
 
@@ -182,19 +187,53 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
                 last_year = current_year
 
         return self.year_change_indices
-       
     
     def _update_usage_constants(self):
-        simulation_factor = 8760/self.network.system_structure_properties["simulated_timesteps"]
-        N = np.ceil(self.network.system_parameters_df.loc["project_life", "value"]/8760)
-        r = (1 + self.network.system_parameters_df.loc["discount_rate", "value"])**-1
-        NPV_factor = (1-r**N)/(1-r)
-        self.cost_fun_params["usage_constant_1"].value = (self.cost_fun_params["usage_constant_1"].value * 
-                                                        NPV_factor * simulation_factor)
-        return
+        """
+        Updates usage cost parameters to a full-length vector matching flow resolution.
+        Supports scalar or yearly values, applies NPV and simulation scaling.
+        """
+        # Step 1: Compute simulation and NPV adjustment
+        simulation_factor = 8760 / self.network.system_structure_properties["simulated_timesteps"]
+        discount_rate = self.network.system_parameters_df.loc["discount_rate", "value"]
+        project_life_hours = self.network.system_parameters_df.loc["project_life", "value"]
+        num_years = int(np.ceil(project_life_hours / 8760))
+    
+        # Step 2: Parse CSV-style input FIRST (before anything else)
+        raw_input = self.parameters_df["usage_constant_1"]
+        raw_costs = self.process_csv_values(raw_input)
+    
+        if raw_costs.size == 1:
+            raw_costs = np.full(num_years, raw_costs[0])
+        elif raw_costs.size != num_years:
+            raise ValueError(f"Expected {num_years} yearly usage cost values, got {raw_costs.size}")
+    
+        # Step 3: Apply NPV discounting and simulation scaling
+        discount_factors = (1 / (1 + discount_rate)) ** np.arange(num_years)
+        yearly_costs = raw_costs * discount_factors * simulation_factor
+    
+        # Step 4: Expand to full-length vector over number_of_edges
+        year_indices = self._get_year_change_indices() + [self.number_of_edges]
+        expanded_costs = np.zeros(self.number_of_edges)
+    
+        for i, (start, end) in enumerate(zip(year_indices[:-1], year_indices[1:])):
+            expanded_costs[start:end] = yearly_costs[i]
+    
+        # Step 5: Assign value to pre-defined Parameter
+        self.cost_fun_params["usage_constant_1"].value = expanded_costs
+
+    
+    def process_csv_values(self,values):
+        """Method converts a comma-separated string to a NumPy array of floats or returns
+        the original numeric values in an array."""
+        if isinstance(values, str):
+            return np.array([float(x) for x in values.split(",")], dtype=float)
+        return np.array(values, dtype=float)  # Ensure it's always a NumPy array
+
         
     def _update_parameters(self):
-        super()._update_parameters()
+        # for parameter_name, parameter in self.cost_fun_params.items():
+        #     parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.parameters_df[parameter_name]
         for parameter_name, parameter in self.conversion_fun_params_3.items():
