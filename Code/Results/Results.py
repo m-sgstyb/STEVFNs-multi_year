@@ -643,6 +643,7 @@ def save_yearly_flows_to_csv(network, output_path):
     flow_data = {}
     
     for asset in network.assets:
+        print(asset.asset_name)
         if not hasattr(asset, "get_yearly_flows"):
             continue  # Skip assets without flow chunk method
 

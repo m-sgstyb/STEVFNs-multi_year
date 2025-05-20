@@ -4,6 +4,8 @@
 Created on Thu Nov  4 17:38:43 2021
 
 @author: aniqahsan
+Adapted by:
+    @author: Mónica Sagastuy-Breña 2025
 """
 
 import pandas as pd
@@ -33,11 +35,8 @@ network_structure_filename = os.path.join(case_study_folder, "Network_Structure.
 
 network_structure_df = pd.read_csv(network_structure_filename)
 
-
-
 ### Build Network ###
 start_time = time.time()
-
 
 my_network = Network_STEVFNs()
 my_network.build(network_structure_df)
@@ -46,8 +45,6 @@ end_time = time.time()
 print("Time taken to build network = ", end_time - start_time, "s")
 total_df = pd.DataFrame()
 total_df_1 = pd.DataFrame()
-
-
 
 for counter1 in range(len(scenario_folders_list)):
 # for counter1 in range(1):
@@ -61,14 +58,11 @@ for counter1 in range(len(scenario_folders_list)):
     location_parameters_df = pd.read_csv(location_parameters_filename)
     system_parameters_df = pd.read_csv(system_parameters_filename)
     
-    
     ### Update Network Parameters ###
     start_time = time.time()
     
-    
     my_network.update(location_parameters_df, asset_parameters_df, system_parameters_df)
     my_network.scenario_name = os.path.basename(scenario_folder)
-    
     
     end_time = time.time()
     print("Time taken to update network = ", end_time - start_time, "s")
@@ -76,13 +70,11 @@ for counter1 in range(len(scenario_folders_list)):
     ### Run Simulation ###
     start_time = time.time()
     
-    
     # my_network.solve_problem()
     my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000, ignore_dpp=False, verbose=False)
     
     end_time = time.time()
 
-    
     ### Plot Results ############
     print("Scenario: ", my_network.scenario_name)
     print("Time taken to solve problem = ", end_time - start_time, "s")
@@ -91,9 +83,6 @@ for counter1 in range(len(scenario_folders_list)):
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
-    # DPhil_Plotting.plot_all(my_network)
-    # DPhil_Plotting.plot_asset_sizes(my_network)
-    # DPhil_Plotting.plot_asset_costs(my_network)
     
    
 yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")

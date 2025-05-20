@@ -350,10 +350,10 @@ def plot_yearly_flows(network, output_folder):
     # Step 1: Collect all asset flow chunks
     asset_flows_by_year = {}
     for asset in network.assets:
-        if not hasattr(asset, "get_yearly_flow_chunks"):
+        if not hasattr(asset, "get_yearly_flows"):
             continue
         try:
-            yearly_chunks = asset.get_yearly_flow_chunks()
+            yearly_chunks = asset.get_yearly_flows()
             asset_flows_by_year[asset.asset_name] = yearly_chunks
         except Exception as e:
             print(f"[Skip] {asset.asset_name}: {e}")
