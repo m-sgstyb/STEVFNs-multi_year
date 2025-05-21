@@ -32,6 +32,10 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         usage_constant_1 = params["usage_constant_1"]  # shape: (n_timesteps,)
         return cp.sum(cp.multiply(usage_constant_1, flows))  # scalar
     
+    # @staticmethod
+    # def conversion_fun(flows, params):
+    #     return flows
+    
     @staticmethod
     def conversion_fun_2(flows, params):
         CO2_emissions_factor = params["CO2_emissions_factor"]
@@ -64,7 +68,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.target_node_location_3 = asset_structure["Location_1"]
         
         self.number_of_edges = len(self.source_node_times)
-        self.flows = cp.Variable(self.number_of_edges, nonneg = True)
+        self.flows = cp.Variable(self.number_of_edges, nonneg = True, name=f"flows_{self.asset_name}")
         self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
         self.cost_fun_params = {"usage_constant_1": cp.Parameter(shape=(self.number_of_edges,),nonneg=True),}
         return
@@ -76,6 +80,22 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.build_emissions_aggregate_edge()
         self.build_edge_3()
         return
+    
+    # def build_edge(self, edge_number):
+    #     source_node_time = self.source_node_times[edge_number]
+    #     target_node_time = self.target_node_times[edge_number]
+    #     new_edge = Edge_STEVFNs()
+    #     self.edges += [new_edge]
+    #     if self.source_node_type != "NULL":
+    #         new_edge.attach_source_node(self.network.extract_node(
+    #             self.source_node_location, self.source_node_type, source_node_time))
+    #     if self.target_node_type != "NULL":
+    #         new_edge.attach_target_node(self.network.extract_node(
+    #             self.target_node_location, self.target_node_type, target_node_time))
+    #     new_edge.flow = self.flows[edge_number]
+    #     new_edge.conversion_fun = self.conversion_fun
+    #     new_edge.conversion_fun_params = self.conversion_fun_params
+    #     return
     
     def build_emissions_aggregate_edge(self):
         source_node_type = self.source_node_type

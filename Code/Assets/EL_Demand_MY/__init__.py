@@ -31,7 +31,7 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
             asset_structure["Period"]
         )
         self.number_of_edges = len(self.node_times)
-        self.flows = cp.Parameter(shape=self.number_of_edges, nonneg=True)
+        self.flows = cp.Parameter(shape=self.number_of_edges, nonneg=True, name=f"flows_{self.asset_name}")
         return
 
     def build_costs(self):

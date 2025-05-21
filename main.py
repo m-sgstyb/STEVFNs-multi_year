@@ -22,7 +22,8 @@ from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
 
 #### Define Input Files ####
-case_study_name = "test_multi_year_2"
+# case_study_name = "MEX_30y_MY"
+case_study_name = "MEX_30y_MY_no_CO2_budget"
 
 
 base_folder = os.path.dirname(__file__)
@@ -71,7 +72,8 @@ for counter1 in range(len(scenario_folders_list)):
     start_time = time.time()
     
     # my_network.solve_problem()
-    my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000, ignore_dpp=False, verbose=False)
+    # my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000, ignore_dpp=False, verbose=True)
+    my_network.problem.solve(solver = cp.MOSEK, ignore_dpp=True, verbose=True)
     
     end_time = time.time()
 
@@ -83,11 +85,12 @@ for counter1 in range(len(scenario_folders_list)):
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
-    
-   
-yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
-Results.save_yearly_flows_to_csv(my_network, yearly_path)
 
-DPhil_Plotting.plot_yearly_flows(my_network, case_study_folder)
-DPhil_Plotting.plot_yearly_flows_stacked(my_network, case_study_folder)
+if my_network.problem.value != float("inf"):
+      
+    yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
+    Results.save_yearly_flows_to_csv(my_network, yearly_path)
+    
+    DPhil_Plotting.plot_yearly_flows(my_network, case_study_folder)
+    DPhil_Plotting.plot_yearly_flows_stacked(my_network, case_study_folder)
 

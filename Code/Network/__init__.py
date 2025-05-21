@@ -39,6 +39,11 @@ class __Edge:
         self.target_node = False
         return
     
+    def __repr__(self):
+        source_type = getattr(self.source_node, "node_type", "None")
+        target_type = getattr(self.target_node, "node_type", "None")
+        return f"<Edge from {source_type} to {target_type}>"
+    
     def attach_source_node(self, source_node):
         self.source_node = source_node
         if source_node == False:
@@ -65,8 +70,6 @@ class Edge_STEVFNs(__Edge):
         super().__init__()
         self.flow = cp.Constant(0)
         self.conversion_fun_params = dict()
-        # Add flag to skip counting certain edges in a balance
-        self.exclude_from_balance = False
         return
     
     def extract_flow(self):
@@ -114,8 +117,6 @@ class Node_STEVFNs(__Node):
     def calculate_total_output_flows(self):
         total_output_flows = cp.Constant(0)
         for output_edge in self.output_edges:
-            if output_edge.exclude_from_balance:  # NEW flag check 
-                continue
             if total_output_flows.sign == "ZERO":
                 total_output_flows = output_edge.flow
             else:
@@ -125,8 +126,6 @@ class Node_STEVFNs(__Node):
     def calculate_total_input_flows(self):
         total_input_flows = cp.Constant(0)
         for input_edge in self.input_edges:
-            if input_edge.exclude_from_balance:  # NEW flag check 
-                continue
             if total_input_flows.sign == "ZERO":
                 total_input_flows = input_edge.extract_flow()
             else:
