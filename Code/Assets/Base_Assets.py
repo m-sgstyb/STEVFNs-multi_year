@@ -146,45 +146,6 @@ class Asset_STEVFNs:
         asset_size = self.asset_size()
         asset_identity = self.asset_name
         return {asset_identity: asset_size}
-    
-    # ======== ADDED METHOD FOR RESULT ANALYSIS ===========#
-    # def get_yearly_flows(self):
-    #     """
-    #     Returns a list of flow slices split by each year using year_change_indices.
-    #     Uses get_plot_data() if available (e.g. RE assets), otherwise self.flows.value.
-    #     """
-    #     # Ensure indices are available
-    #     if not hasattr(self, "year_change_indices"):
-    #         if hasattr(self, "_get_year_change_indices"):
-    #             self._get_year_change_indices()
-    #         else:
-    #             raise AttributeError("Asset has no year_change_indices or method to compute them.")
-    
-    #     # Get full flow vector (as flat NumPy array)
-    #     if hasattr(self, "get_plot_data"):
-    #         try:
-    #             # Used for RE assets like RE_PV or RE_WIND
-    #             flows_full = np.array(self.get_plot_data()).flatten()
-    #         except Exception as e:
-    #             raise RuntimeError(f"Failed to extract flow data using get_plot_data: {e}")
-    #     elif hasattr(self, "flows") and hasattr(self.flows, "value"):
-    #         flows_full = self.flows.value
-    #     else:
-    #         raise AttributeError("Cannot extract flow data from asset.")
-    
-    #     # Guard against None or unexpected shape
-    #     if flows_full is None:
-    #         raise ValueError("Flow values not assigned yet.")
-        
-    #     if not isinstance(flows_full, np.ndarray):
-    #         flows_full = np.array(flows_full)
-    
-    #     # Final slicing using year_change_indices
-    #     year_indices = list(self.year_change_indices) + [len(flows_full)]
-    #     yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        
-    #     return yearly_flows
-    # ======== END OF NEW ADDITION ==========#
 
             
 class Multi_Asset(Asset_STEVFNs):
