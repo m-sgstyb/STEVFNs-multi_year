@@ -22,15 +22,23 @@ from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
 
 #### Define Input Files ####
-# case_study_name = "MEX_30y_MY"
+case_study_name = "MEX_30y_MY"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
-case_study_name = "toy_wind_PP"
+# case_study_name = "toy_wind_PP"
 
 
 base_folder = os.path.dirname(__file__)
 data_folder = os.path.join(base_folder, "Data")
 case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
+results_folder = os.path.join(case_study_folder, "Results")
+if not os.path.exists(results_folder):
+    os.mkdir(results_folder)
+# scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
+# network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
+
+# Get list of scenario folders, excluding the Results folder
 scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
+scenario_folders_list = [f for f in scenario_folders_list if os.path.basename(f) != "Results"]
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
 ### Read Input Files ###
@@ -85,13 +93,17 @@ for counter1 in range(len(scenario_folders_list)):
     if my_network.problem.value == float("inf"):
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
-    print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
+    # print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
 
-# if my_network.problem.value != float("inf"):
+if my_network.problem.value != float("inf"):
       
-#     yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
-#     Results.save_yearly_flows_to_csv(my_network, yearly_path)
+    yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
+    Results.save_yearly_flows_to_csv(my_network, yearly_path)
     
-#     DPhil_Plotting.plot_yearly_flows(my_network, case_study_folder)
-#     DPhil_Plotting.plot_yearly_flows_stacked(my_network, case_study_folder)
+    DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
+    DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
 
+
+DPhil_Plotting.get_install_pathways(my_network.assets[1], results_folder, tech_name="PV")
+DPhil_Plotting.get_install_pathways(my_network.assets[2], results_folder, tech_name="Wind")
+DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")

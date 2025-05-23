@@ -670,4 +670,3 @@ def save_yearly_flows_to_csv(network, output_path):
     df.to_csv(output_path, index=False)
     print(f"[✓] Yearly flows saved to {output_path}")
     
-

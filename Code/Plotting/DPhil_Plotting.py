@@ -466,3 +466,94 @@ def plot_yearly_flows_stacked(network, output_folder):
 
     
     print(f"[✓] Stacked plots saved to: {output_folder}")
+    
+def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
+    """
+    Plots installed capacity pathways for a technology asset (wind/solar).
+    """
+    # Ensure optimization has been solved
+    if tech_asset.flows.value is None:
+        raise ValueError(f"{tech_name}: Optimization problem must be solved before extracting values.")
+
+    # Extract arrays safely
+    try:
+        new_installed = np.array(tech_asset.flows.value, dtype=float).flatten()
+        cumulative_new = np.array(tech_asset.cumulative_new_installed.value, dtype=float).flatten()
+        existing = np.array(tech_asset.conversion_fun_params["existing_capacity"].value, dtype=float).flatten()
+    except Exception as e:
+        raise TypeError(f"Error converting expressions to float: {e}")
+
+    total_existing = cumulative_new + existing
+    years = np.arange(len(new_installed))
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(years, new_installed, label="New Installed Capacity", color="skyblue")
+    ax.plot(years, total_existing, color="navy", linewidth=2, marker="o", label="Total Existing Capacity")
+
+    ax.set_title(f"{tech_name} Capacity Installation Pathway")
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Capacity [GWp]")
+    ax.legend()
+    ax.grid(True)
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name}.png"))
+    
+def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1="Tech 1", tech_name_2="Tech 2"):
+    """
+    Plots installed capacity pathways for two technology assets using dual y-axes.
+    - Bars show new installs (left axis).
+    - Lines show cumulative existing capacity (right axis).
+    - Legends are separated.
+    """
+    # Check optimization results
+    for tech_asset, name in [(tech_asset_1, tech_name_1), (tech_asset_2, tech_name_2)]:
+        if tech_asset.flows.value is None:
+            raise ValueError(f"{name}: Optimization must be solved before plotting.")
+
+    # Extract data
+    try:
+        new_1 = np.array(tech_asset_1.flows.value, dtype=float).flatten()
+        cum_1 = np.array(tech_asset_1.cumulative_new_installed.value, dtype=float).flatten()
+        exist_1 = np.array(tech_asset_1.conversion_fun_params["existing_capacity"].value, dtype=float).flatten()
+
+        new_2 = np.array(tech_asset_2.flows.value, dtype=float).flatten()
+        cum_2 = np.array(tech_asset_2.cumulative_new_installed.value, dtype=float).flatten()
+        exist_2 = np.array(tech_asset_2.conversion_fun_params["existing_capacity"].value, dtype=float).flatten()
+    except Exception as e:
+        raise TypeError(f"Error converting expressions to float: {e}")
+
+    total_1 = cum_1 + exist_1
+    total_2 = cum_2 + exist_2
+    years = np.arange(len(new_1))
+    width = 0.35
+
+    # Setup figure and axes
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax2 = ax1.twinx()
+
+    # Plot bars (new installs)
+    bars1 = ax1.bar(years - width/2, new_1, width=width, label=f"{tech_name_1}", color="skyblue")
+    bars2 = ax1.bar(years + width/2, new_2, width=width, label=f"{tech_name_2}", color="lightcoral")
+
+    # Plot lines (total capacity)
+    line1, = ax2.plot(years, total_1, color="navy", marker="o", linewidth=2, label=f"{tech_name_1}")
+    line2, = ax2.plot(years, total_2, color="darkred", marker="s", linewidth=2, label=f"{tech_name_2}")
+
+    # Axis labels and title
+    ax1.set_xlabel("Year")
+    ax1.set_ylabel("New Installed Capacity [GWp]", color="gray")
+    ax2.set_ylabel("Total Existing Capacity [GWp]", color="black")
+    ax1.set_title("Installed Capacity Pathways")
+    ax1.set_xticks(years)
+    ax1.grid(True, which='major', linestyle='--', alpha=0.5)
+
+    # Separate legends
+    bar_legend = ax1.legend(handles=[bars1, bars2], title="New Installs", loc="upper left")
+    ax1.add_artist(bar_legend)  # Add bar legend first
+    ax2.legend(handles=[line1, line2], title="Total Capacity", bbox_to_anchor=[0.15, 1], loc="upper left")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}.png"))
+    plt.show()

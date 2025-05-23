@@ -32,10 +32,6 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         usage_constant_1 = params["usage_constant_1"]  # shape: (n_timesteps,)
         return cp.sum(cp.multiply(usage_constant_1, flows))  # scalar
     
-    # @staticmethod
-    # def conversion_fun(flows, params):
-    #     return flows
-    
     @staticmethod
     def conversion_fun_2(flows, params):
         CO2_emissions_factor = params["CO2_emissions_factor"]
@@ -70,67 +66,84 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self.number_of_edges = len(self.source_node_times)
         self.flows = cp.Variable(self.number_of_edges, nonneg = True, name=f"flows_{self.asset_name}")
         self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
-        self.cost_fun_params = {"usage_constant_1": cp.Parameter(shape=(self.number_of_edges,),nonneg=True),}
+        self.cost_fun_params = {"usage_constant_1": cp.Parameter(shape=(self.number_of_edges,),nonneg=True,
+                                                                 name=f"usage_cost_{self.asset_name}"),}
+        self.conversion_fun_params_2 = {"CO2_emissions_factor": cp.Parameter(nonneg=True,
+                                                                             name=f"emissions_factor_{self.asset_name}")}
         return
         
     def build_edges(self):
         super().build_edges()
-        # for counter1 in range(self.number_of_edges):
-        #     self.build_edge_2(counter1)
-        self.build_emissions_aggregate_edge()
+        for year in range(self.num_years):
+            self.build_emissions_edges_per_year(year)
         self.build_edge_3()
         return
     
-    # def build_edge(self, edge_number):
-    #     source_node_time = self.source_node_times[edge_number]
-    #     target_node_time = self.target_node_times[edge_number]
-    #     new_edge = Edge_STEVFNs()
-    #     self.edges += [new_edge]
-    #     if self.source_node_type != "NULL":
-    #         new_edge.attach_source_node(self.network.extract_node(
-    #             self.source_node_location, self.source_node_type, source_node_time))
-    #     if self.target_node_type != "NULL":
-    #         new_edge.attach_target_node(self.network.extract_node(
-    #             self.target_node_location, self.target_node_type, target_node_time))
-    #     new_edge.flow = self.flows[edge_number]
-    #     new_edge.conversion_fun = self.conversion_fun
-    #     new_edge.conversion_fun_params = self.conversion_fun_params
-    #     return
-    
-    def build_emissions_aggregate_edge(self):
+    def build_emissions_edges_per_year(self, year_number):
+        """Build one emissions edge per year that sums all hourly emissions for that year."""
         source_node_type = self.source_node_type
-        source_node_location = self.source_node_location
-        source_node_time = 0
         target_node_type = self.target_node_type_2
-        target_node_location = self.target_node_location_2
-        target_node_time = self.target_node_time_2
+        source_node_location = self.source_node_location
+        target_node_location = source_node_location  # Assuming same loc
     
-        new_edge = Edge_STEVFNs()
-        self.edges += [new_edge]
+        source_node_time = year_number
+        target_node_time = year_number
+    
+        # Get year index bounds
+        year_change_indices = self._get_year_change_indices()
+        year_change_indices.append(self.number_of_edges)
+    
+        start = year_change_indices[year_number]
+        end = year_change_indices[year_number + 1]
+    
+        # Get all hourly flows for the year
+        yearly_flows = self.flows[start:end]
+    
+        # Compute total emissions
+        yearly_emissions = self.conversion_fun_2(yearly_flows, self.conversion_fun_params_2)
+        yearly_emissions_sum = cp.sum(yearly_emissions)
+    
+        # Create and connect the edge
+        edge = Edge_STEVFNs()
+        self.edges.append(edge)
     
         if source_node_type != "NULL":
-            new_edge.attach_source_node(
-                self.network.extract_node(source_node_location, source_node_type, source_node_time))
+            edge.attach_source_node(
+                self.network.extract_node(source_node_location, source_node_type, source_node_time)
+            )
     
         if target_node_type != "NULL":
-            new_edge.attach_target_node(
-                self.network.extract_node(target_node_location, target_node_type, target_node_time))
-        # Create yearly sums from self.flows
-        year_indices = self._get_year_change_indices()
-        year_indices.append(self.number_of_edges)  # ensure full coverage
+            edge.attach_target_node(
+                self.network.extract_node(target_node_location, target_node_type, target_node_time)
+            )
     
-        yearly_sums = []
-        for start, end in zip(year_indices[:-1], year_indices[1:]):
-            yearly_sums.append(cp.sum(self.flows[start:end]))
-        # Set the yearly profile (cvxpy Expression vector)
-        new_edge.flow = cp.hstack(yearly_sums)
-        # Apply CO2 emissions factor conversion wiht flows
-        new_edge.conversion_fun = self.conversion_fun_2
-        new_edge.conversion_fun_params = self.conversion_fun_params_2
-        return
+        edge.flow = yearly_emissions_sum
+        # edge.conversion_fun = None
+        # edge.conversion_fun_params = {}
 
+     # def build_emissions_edges(self, edge_number):
+     #     '''Build edges per timestep for emissions'''
+     #     source_node_type = self.source_node_type
+     #     target_node_type = self.target_node_type_2
+     #     source_node_location = self.source_node_location
+     #     target_node_location = source_node_location
+     #     source_node_time = self.source_node_times[edge_number]
+     #     target_node_time = self.target_node_times[edge_number]
+     #     new_edge = Edge_STEVFNs()
+     #     self.edges += [new_edge]
+     #     if source_node_type != "NULL":
+     #         new_edge.attach_source_node(self.network.extract_node(
+     #             source_node_location, source_node_type, source_node_time))
+     #     if target_node_type != "NULL":
+     #         new_edge.attach_target_node(self.network.extract_node(
+     #             target_node_location, target_node_type, target_node_time))
+     #     new_edge.flow = self.flows[edge_number]
+     #     new_edge.conversion_fun = self.conversion_fun_2
+     #     new_edge.conversion_fun_params = self.conversion_fun_params_2
+ 
 
     def build_edge_3(self):
+        '''Build edge to limit hourly peak generation'''
         source_node_type = "NULL"
         source_node_location = self.source_node_location_3
         source_node_time = 0
