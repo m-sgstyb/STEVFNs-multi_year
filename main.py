@@ -33,16 +33,13 @@ case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
 results_folder = os.path.join(case_study_folder, "Results")
 if not os.path.exists(results_folder):
     os.mkdir(results_folder)
-# scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
-# network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
 # Get list of scenario folders, excluding the Results folder
 scenario_folders_list = [x[0] for x in os.walk(case_study_folder)][1:]
-scenario_folders_list = [f for f in scenario_folders_list if os.path.basename(f) != "Results"]
+scenario_folders_list = [f for f in scenario_folders_list if os.path.basename(f) != "Results"] # filter out the results folder
 network_structure_filename = os.path.join(case_study_folder, "Network_Structure.csv")
 
-### Read Input Files ###
-
+### Read Network Structure file ###
 network_structure_df = pd.read_csv(network_structure_filename)
 
 ### Build Network ###
@@ -79,21 +76,20 @@ for counter1 in range(len(scenario_folders_list)):
     
     ### Run Simulation ###
     start_time = time.time()
-    
-    # my_network.solve_problem()
     # my_network.problem.solve(solver = cp.CLARABEL, max_iter=10000, ignore_dpp=False, verbose=True)
     my_network.problem.solve(solver = cp.MOSEK, ignore_dpp=True, verbose=True)
-    
     end_time = time.time()
 
-    ### Plot Results ############
+    ######## Print Results ############
     print("Scenario: ", my_network.scenario_name)
     print("Time taken to solve problem = ", end_time - start_time, "s")
     print(my_network.problem.solution.status)
     if my_network.problem.value == float("inf"):
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
-    # print("Total emissions = ", my_network.assets[0].asset_size(), "MtCO2e")
+    for asset in my_network.assets:
+        if asset.asset_name == "CO2_Budget_MY":
+            print("Total emissions = ", asset.asset_size(), "MtCO2e")
 
 if my_network.problem.value != float("inf"):
       

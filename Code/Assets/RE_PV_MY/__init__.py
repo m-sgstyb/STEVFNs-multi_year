@@ -79,7 +79,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True)}
         self.year_change_indices = self._get_year_change_indices()
-        self.asset_lifetime = 20
+        self.asset_lifetime = 20 # hard-coded for testing
         return
     
     def build_edge(self, edge_number):
@@ -96,7 +96,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                 index_number = i
             else:
                 break
-    
         # Lifetime mask: shape (num_years, num_years)
         # Each row corresponds to a year; each column corresponds to when capacity was installed
         lifetime_mask = np.zeros((self.num_years, self.num_years), dtype=int)
@@ -109,18 +108,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # Cumulative installed capacity in each year
         # This multiplies each flow by its active years
         self.cumulative_new_installed = cp.matmul(lifetime_mask, self.flows)
-        
-        # # Rolling accumulation based on asset lifetime
-        # for install_year in range(self.num_years):
-        #     active_end_year = min(install_year + self.asset_lifetime, self.num_years)
-        #     for active_year in range(install_year, active_end_year):
-        #         self.cumulative_new_installed[active_year] += self.flows[install_year]
-        
-        # # Convert to CVXPY expression (column vector)
-        # self.cumulative_new_installed = cp.hstack(self.cumulative_new_installed)
         new_edge.flow = (self.cumulative_new_installed[index_number] + self.conversion_fun_params["existing_capacity"][index_number])\
             * self.gen_profile[edge_number]
-        
         return
     
     def build_edge_2(self):
@@ -152,27 +141,27 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # self.build_edge_2()
         return
     
-    def _update_capacities(self):
-        """Update existing capacities dynamically for multi-year optimization."""
+    # def _update_capacities(self):
+    #     """Update existing capacities dynamically for multi-year optimization."""
         
-        # Get the historical cumulative capacities
-        historic_capacities = self._get_cumulative_capacities_array().tolist()
-        final_capacity_expressions = []
-        self.cumulative_capacity = historic_capacities.copy()
+    #     # Get the historical cumulative capacities
+    #     historic_capacities = self._get_cumulative_capacities_array().tolist()
+    #     final_capacity_expressions = []
+    #     self.cumulative_capacity = historic_capacities.copy()
         
-        for year in range(self.num_years):
-            new_installed = self.flows[year]  # ✅ Always use current year's flow
+    #     for year in range(self.num_years):
+    #         new_installed = self.flows[year]  # ✅ Always use current year's flow
             
-            # Determine which years this capacity should be active (lifetime)
-            start_idx = year
-            end_idx = min(year + self.asset_lifetime, self.num_years)
+    #         # Determine which years this capacity should be active (lifetime)
+    #         start_idx = year
+    #         end_idx = min(year + self.asset_lifetime, self.num_years)
     
-            for i in range(start_idx, end_idx):
-                self.cumulative_capacity[i] += new_installed  # ✅ Only added once per lifetime window
+    #         for i in range(start_idx, end_idx):
+    #             self.cumulative_capacity[i] += new_installed  # ✅ Only added once per lifetime window
     
-            final_capacity_expressions.append(self.cumulative_capacity[year])
+    #         final_capacity_expressions.append(self.cumulative_capacity[year])
         
-        self.final_capacity = cp.hstack(final_capacity_expressions)
+    #     self.final_capacity = cp.hstack(final_capacity_expressions)
     
     def process_csv_values(self,values):
         """Method converts a comma-separated string to a NumPy array of floats or returns
