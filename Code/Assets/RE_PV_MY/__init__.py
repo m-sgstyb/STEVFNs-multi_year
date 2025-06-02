@@ -50,6 +50,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(nonneg=True)}
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
+        self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
+                                                                       name=f"tech_potential_{self.asset_name}")}
         return
     
     def define_structure(self, asset_structure):
@@ -78,6 +80,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                                                                 nonneg=True, name=f"existingcap_{self.asset_name}"),}
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True)}
+        self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
+                                                                       name=f"tech_potential_{self.asset_name}")}
         self.year_change_indices = self._get_year_change_indices()
         self.asset_lifetime = 20 # hard-coded for testing
         return
@@ -108,6 +112,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # Cumulative installed capacity in each year
         # This multiplies each flow by its active years
         self.cumulative_new_installed = cp.matmul(lifetime_mask, self.flows)
+        
         new_edge.flow = (self.cumulative_new_installed[index_number] + self.conversion_fun_params["existing_capacity"][index_number])\
             * self.gen_profile[edge_number]
         return
@@ -134,34 +139,77 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         new_edge.conversion_fun_params = self.conversion_fun_params_2
         return
     
+    def build_max_capacity_edges(self, year_number):
+        '''
+        Builds edges per year to constrain maximum capacity to be installed per year
+        Explicitly sets edge flow
+        '''
+        source_node_type = self.source_node_type_2
+        source_node_location = self.source_node_location_2
+        target_node_type = self.target_node_location_2
+        target_node_location = source_node_location
+        
+        source_node_time = 0
+        target_node_time = year_number
+        
+        # Get the installed capacity in that year
+        installed_capacity = self.cumulative_new_installed[year_number]
+    
+        # Create edge with balance = max_capacity - installed_capacity
+        edge = Edge_STEVFNs()
+        self.edges.append(edge)
+    
+        if source_node_type != "NULL":
+            edge.attach_source_node(
+                self.network.extract_node(source_node_location, source_node_type, source_node_time)
+            )
+    
+        if target_node_type != "NULL":
+            edge.attach_target_node(
+                self.network.extract_node(target_node_location, target_node_type, target_node_time)
+            )
+        # Define flow as max capacity minus actual installed capacity
+        max_capacity_param = self.conversion_fun_params_2["maximum_size"]
+        edge.flow = max_capacity_param[year_number] - installed_capacity
+        
+    def build_tech_potential_edges(self, year_number):
+        source_node_type = "NULL"
+        source_node_location = self.source_node_location_2
+        target_node_type = "RE_WIND_Tech"
+        target_node_location = source_node_location
+        
+        source_node_time = 0
+        target_node_time = year_number
+        cumulative_new_installed_in_year = self.cumulative_new_installed[year_number]
+        existing_historic = self.conversion_fun_params["existing_capacity"][year_number]
+        
+        total_available_capacity = cumulative_new_installed_in_year + existing_historic
+        
+        # Create edge with balance = max_technical_capacity - installed_capacity
+        edge = Edge_STEVFNs()
+        self.edges.append(edge)
+    
+        if source_node_type != "NULL":
+            edge.attach_source_node(
+                self.network.extract_node(source_node_location, source_node_type, source_node_time)
+            )
+    
+        if target_node_type != "NULL":
+            edge.attach_target_node(
+                self.network.extract_node(target_node_location, target_node_type, target_node_time)
+            )
+        # Define flow as max capacity minus actual installed capacity
+        technical_capacity = self.conversion_fun_params_3["tech_potential"]
+        edge.flow = technical_capacity - total_available_capacity
+    
     def build_edges(self):
         self.edges = []
-        for counter1 in range(self.number_of_edges):
-            self.build_edge(counter1)
-        # self.build_edge_2()
+        for hour in range(self.number_of_edges):
+            self.build_edge(hour)
+        for year in range(self.num_years):
+            self.build_max_capacity_edges(year)
+            self.build_tech_potential_edges(year)
         return
-    
-    # def _update_capacities(self):
-    #     """Update existing capacities dynamically for multi-year optimization."""
-        
-    #     # Get the historical cumulative capacities
-    #     historic_capacities = self._get_cumulative_capacities_array().tolist()
-    #     final_capacity_expressions = []
-    #     self.cumulative_capacity = historic_capacities.copy()
-        
-    #     for year in range(self.num_years):
-    #         new_installed = self.flows[year]  # ✅ Always use current year's flow
-            
-    #         # Determine which years this capacity should be active (lifetime)
-    #         start_idx = year
-    #         end_idx = min(year + self.asset_lifetime, self.num_years)
-    
-    #         for i in range(start_idx, end_idx):
-    #             self.cumulative_capacity[i] += new_installed  # ✅ Only added once per lifetime window
-    
-    #         final_capacity_expressions.append(self.cumulative_capacity[year])
-        
-    #     self.final_capacity = cp.hstack(final_capacity_expressions)
     
     def process_csv_values(self,values):
         """Method converts a comma-separated string to a NumPy array of floats or returns
@@ -169,91 +217,203 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         if isinstance(values, str):
             return np.array([float(x) for x in values.split(",")], dtype=float)
         return np.array(values, dtype=float)  # Ensure it's always a NumPy array
-
+    
+    # def _get_amortised_discounted_cost(self):
+    #     '''
+    #     Calculates discounted and amortised costs matrix for installed capacity
+    #     '''
+    #     # Hard-coded cost curve (per-unit capital cost in each year)
+    #     cost_array = np.array([
+    #         0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
+    #         0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
+    #         0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
+    #         0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
+    #         0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
+    #         0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
+    #     ])
         
+    #     num_years = self.num_years
+    #     asset_lifetime = 20  # years
+    #     interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
+    #     discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
+    
+    #     # Amortization factor (same for all years, applied to cost per unit)
+    #     r = interest_rate
+    #     n = asset_lifetime
+    #     amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
+    
+    #     # Apply amortization formula to each year's cost
+    #     self.amortised_cost = cost_array[:num_years] * amort_factor  # shape (num_years,)
+    
+    #     # Create index matrices (i: payment year, j: install year)
+    #     i, j = np.meshgrid(np.arange(num_years), np.arange(num_years), indexing='ij')
+    
+    #     # Discount factor to present value from payment year i to install year j
+    #     discount_factor = (1 + discount_rate) ** (i - j)
+    
+    #     # Valid payments only where payment happens within asset lifetime
+    #     valid_mask = (i >= j) & (i < j + asset_lifetime)
+    
+    #     # Reshape amortised_cost and flows for broadcasting
+    #     amortised_j = cp.reshape(self.amortised_cost, (1, num_years))
+    #     flows_j = cp.reshape(self.flows, (1, num_years))
+    
+    #     # Calculate payments matrix
+    #     raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
+    #     self.payments_M = cp.multiply(raw_payments, valid_mask)
+        
+    #     return cp.sum(self.payments_M)
+    
     def _get_amortised_discounted_cost(self):
         '''
-        Calculates discounted and amortised costs matrix for installed capacity
+        Calculates total discounted and amortised cost scaled for representative timesteps.
         '''
-        cost_array = np.array([1.05,1.045,1.04459,1.0439,1.0426,1.03998,1.038,1.026,1.025,1.02366,0.952,0.921,0.8992,0.851,0.836,0.82,0.76,0.714,0.651,0.592,0.488,0.456,0.449,0.426,0.413,0.4,0.3,0.25,0.2,0.1]) # Hard-coded for testing
-        num_years = self.num_years
-        asset_lifetime = 20 # hard-coded for testing
+    
+        # Cost per year (learning curve)
+        cost_array = np.array([
+            0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
+            0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
+            0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
+            0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
+            0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
+            0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
+        ])  # or pass it in
+    
+        asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
-        
-        # Calculate amortised cost array
-        self.amortised_cost = np.array([amort(c, interest_rate, asset_lifetime) for c in cost_array])
-        # Create index matrices
-        i, j = np.meshgrid(np.arange(num_years), np.arange(num_years), indexing='ij')
-        
-        # Define discount factor (only upper triangular part matters)
-        discount_factor = (1 + discount_rate) ** (j - i)
-        valid_mask = j >= i  # Upper triangular mask
-        
-        # Payments matrix (CVXPY constraints ensure element-wise operations are valid)
-        self.payments_M = cp.multiply(self.flows[i], self.amortised_cost[i]) / discount_factor
-        
-        # Apply mask to ignore lower triangular part
-        self.payments_M = cp.multiply(self.payments_M, valid_mask)
-        
-        return cp.sum(self.payments_M)
-        
+        project_years = self.num_years
     
+        # Amortisation factor for annualised cost
+        r = interest_rate
+        n = asset_lifetime
+        amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
+    
+        amortised_cost = cost_array * amort_factor  # shape (project_years,)
+    
+        # Create index matrices for payment timing
+        i, j = np.meshgrid(np.arange(project_years), np.arange(project_years), indexing='ij')
+        discount_factor = (1 + discount_rate) ** (i - j)
+        valid_mask = (i >= j) & (i < j + asset_lifetime)
+    
+        amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)
+        flows_j = cp.reshape(self.flows, (1, project_years))  # shape (1, years)
+    
+        raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
+        self.payments_M = cp.multiply(raw_payments, valid_mask)
+    
+        # --- NEW: Time scaling to represent full project horizon ---
+        # Total real hours over the project
+        total_hours = project_years * 365 * 24
+    
+        # Sampled hours in the optimization
+        sampled_hours = self.number_of_edges  # Initiated timesteps modelled in asset structure
+    
+        time_scaling_factor = total_hours / sampled_hours
+    
+        return cp.sum(self.payments_M) * time_scaling_factor
+
     
     def _update_parameters(self):
-        """Updates model parameters efficiently by processing cost projections, max capacities, and min capacities."""
+        """Updates model parameters efficiently by processing cost projections,
+        max capacities, and technical potential."""
     
         # Update cost function parameters
         for parameter_name, parameter in self.cost_fun_params.items():
             parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
-    
         for parameter_name, parameter in self.conversion_fun_params.items():
             parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
-    
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
-    
+        for parameter_name, parameter in self.conversion_fun_params_3.items():
+            parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
         self._load_RE_profile()
     
     def update(self, asset_type):
         self._load_parameters_df(asset_type)
-        # self._load_historic_capacity_params()
         self._update_parameters()
         return
     
+    # def _load_RE_profile(self):
+    #     """This function reads file and updates self.gen_profile 
+    #     This is the old version, with evenly spaced sets for one year
+    #     """
+    #     lat_lon_df = self.network.lat_lon_df.iloc[self.target_node_location]
+    #     lat = lat_lon_df["lat"]
+    #     lat = np.int64(np.round((lat) / 0.5)) * 0.5
+    #     lat = min(lat,90.0)
+    #     lat = max(lat,-90.0)
+    #     LAT = "{:0.1f}".format(lat)
+    #     lon = lat_lon_df["lon"]
+    #     lon = np.int64(np.round((lon) / 0.625)) * 0.625
+    #     lon = min(lon, 179.375)
+    #     lon = max(lon, -180.0)
+    #     LON = str(lon)
+    #     RE_TYPE = self.parameters_df["RE_type"]
+    #     profile_folder = os.path.join(self.parameters_folder, "profiles", RE_TYPE, r"lat"+LAT)
+    #     profile_filename = RE_TYPE + r"_lat" + LAT + r"_lon" + LON + r".csv"
+    #     profile_filename = os.path.join(profile_folder, profile_filename)
+    #     with open(profile_filename, encoding='utf-8-sig') as f:
+    #         full_profile = np.loadtxt(f)
+    #     set_size = self.parameters_df["set_size"]
+    #     set_number = self.parameters_df["set_number"]
+    #     n_sets = int(np.ceil(self.number_of_edges/set_size))
+    #     gap = int(len(full_profile) / (n_sets * set_size)) * set_size
+    #     offset = set_size * set_number
+    #     new_profile = np.zeros(int(n_sets * set_size))
+    #     for counter1 in range(n_sets):
+    #         old_loc_0 = offset + gap*counter1
+    #         old_loc_1 = old_loc_0 + set_size
+    #         new_loc_0 = set_size * counter1
+    #         new_loc_1 = new_loc_0 + set_size
+    #         new_profile[new_loc_0 : new_loc_1] = full_profile[old_loc_0 : old_loc_1]
+    #     self.gen_profile.value = new_profile[:self.number_of_edges]
+    #     return
+    
     def _load_RE_profile(self):
-        """This function reads file and updates self.gen_profile """
+        """Loads renewable profile and resamples to representative days per year"""
+        # --- Location-based profile filename selection ---
         lat_lon_df = self.network.lat_lon_df.iloc[self.target_node_location]
         lat = lat_lon_df["lat"]
-        lat = np.int64(np.round((lat) / 0.5)) * 0.5
-        lat = min(lat,90.0)
-        lat = max(lat,-90.0)
+        lat = np.int64(np.round(lat / 0.5)) * 0.5
+        lat = min(lat, 90.0)
+        lat = max(lat, -90.0)
         LAT = "{:0.1f}".format(lat)
+    
         lon = lat_lon_df["lon"]
-        lon = np.int64(np.round((lon) / 0.625)) * 0.625
+        lon = np.int64(np.round(lon / 0.625)) * 0.625
         lon = min(lon, 179.375)
         lon = max(lon, -180.0)
         LON = str(lon)
+    
         RE_TYPE = self.parameters_df["RE_type"]
-        profile_folder = os.path.join(self.parameters_folder, "profiles", RE_TYPE, r"lat"+LAT)
-        profile_filename = RE_TYPE + r"_lat" + LAT + r"_lon" + LON + r".csv"
-        profile_filename = os.path.join(profile_folder, profile_filename)
+        profile_folder = os.path.join(self.parameters_folder, "profiles", RE_TYPE, r"lat" + LAT)
+        profile_filename = os.path.join(profile_folder, RE_TYPE + r"_lat" + LAT + r"_lon" + LON + r".csv")
+    
         with open(profile_filename, encoding='utf-8-sig') as f:
             full_profile = np.loadtxt(f)
-        set_size = self.parameters_df["set_size"]
-        set_number = self.parameters_df["set_number"]
-        n_sets = int(np.ceil(self.number_of_edges/set_size))
-        gap = int(len(full_profile) / (n_sets * set_size)) * set_size
-        offset = set_size * set_number
-        new_profile = np.zeros(int(n_sets * set_size))
-        for counter1 in range(n_sets):
-            old_loc_0 = offset + gap*counter1
-            old_loc_1 = old_loc_0 + set_size
-            new_loc_0 = set_size * counter1
-            new_loc_1 = new_loc_0 + set_size
-            new_profile[new_loc_0 : new_loc_1] = full_profile[old_loc_0 : old_loc_1]
-        self.gen_profile.value = new_profile[:self.number_of_edges]
+    
+        # --- Sampling parameters ---
+        total_hours = len(full_profile)
+        hours_per_year = 8760
+        n_years = total_hours // hours_per_year # number of years in project
+        hours_per_day = 24
+        days_per_year = int((self.number_of_edges / hours_per_day) / n_years) # (sampled hours / hours per day) / project life
+    
+        # --- Build new profile ---
+        new_profile = []
+    
+        for year in range(n_years):
+            year_start = year * hours_per_year
+            for d in range(days_per_year):
+                # Spread days evenly across the year
+                day_idx = int((d + 0.5) * hours_per_year / days_per_year / hours_per_day)
+                hour_idx = year_start + day_idx * hours_per_day
+                new_profile.extend(full_profile[hour_idx:hour_idx + hours_per_day])
+    
+        self.gen_profile.value = np.array(new_profile)
         return
+
 
     def get_plot_data(self):
         '''
@@ -285,29 +445,38 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         asset_identity = self.asset_name + r"_" + self.parameters_df["RE_type"] + r"_location_" + str(self.target_node_location)
         return {asset_identity: asset_size}
     
+    # def _get_year_change_indices(self):
+    #     """ Sampled year change indices in new profile when I was sampling over whole project"""
+    #     timesteps = self.number_of_edges
+    #     num_years = self.num_years
+    #     total_length = 8760 * num_years
+    #     set_size = 24
+    #     set_number = 0
+    #     n_sets = int(np.ceil(timesteps / set_size))
+    #     gap = int(total_length / (n_sets * set_size)) * set_size
+    #     offset = set_size * set_number
+    
+    #     year_change_indices = []
+    #     last_year = -1
+    
+    #     for counter1 in range(n_sets):
+    #         old_loc_0 = offset + gap * counter1
+    #         new_loc_0 = set_size * counter1
+    
+    #         current_year = old_loc_0 // 8760
+    #         if current_year != last_year:
+    #             year_change_indices.append(new_loc_0)
+    #             last_year = current_year
+    
+    #     return year_change_indices
+    
     def _get_year_change_indices(self):
-        timesteps = self.number_of_edges
+        hours_per_day = 24
         num_years = self.num_years
-        total_length = 8760 * num_years
-        set_size = 24
-        set_number = 0
-        n_sets = int(np.ceil(timesteps / set_size))
-        gap = int(total_length / (n_sets * set_size)) * set_size
-        offset = set_size * set_number
-    
-        year_change_indices = []
-        last_year = -1
-    
-        for counter1 in range(n_sets):
-            old_loc_0 = offset + gap * counter1
-            new_loc_0 = set_size * counter1
-    
-            current_year = old_loc_0 // 8760
-            if current_year != last_year:
-                year_change_indices.append(new_loc_0)
-                last_year = current_year
-    
-        return year_change_indices
+        days_per_year = int((self.number_of_edges / hours_per_day) / num_years)
+        hours_per_year = days_per_year * hours_per_day
+        self.year_change_indices = [i * hours_per_year for i in range(num_years)]
+        return self.year_change_indices
     
     def get_yearly_flows(self):
         """

@@ -31,6 +31,7 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
             asset_structure["Period"]
         )
         self.number_of_edges = len(self.node_times)
+        self.num_years =  int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
         self.flows = cp.Parameter(shape=self.number_of_edges, nonneg=True, name=f"flows_{self.asset_name}")
         return
 
@@ -63,46 +64,58 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
         # Optional: make column name flexible
         demand_column = self.parameters_df.get("profile_column", "Demand")
         full_profile = np.array(profile_df[demand_column])
-
-        set_size = self.parameters_df["set_size"]
-        set_number = self.parameters_df["set_number"]
-        n_sets = int(np.ceil(self.number_of_edges / set_size))
-        gap = int(len(full_profile) / (n_sets * set_size)) * set_size
-        offset = set_size * set_number
-
-        new_profile = np.zeros(n_sets * set_size)
-        for counter1 in range(n_sets):
-            old_loc_0 = offset + gap * counter1
-            old_loc_1 = old_loc_0 + set_size
-            new_loc_0 = set_size * counter1
-            new_loc_1 = new_loc_0 + set_size
-            new_profile[new_loc_0:new_loc_1] = full_profile[old_loc_0:old_loc_1]
+        
+        # --- Sampling parameters ---
+        total_hours = len(full_profile)
+        hours_per_year = 8760
+        n_years = total_hours // hours_per_year # number of years in project
+        hours_per_day = 24
+        days_per_year = int((self.number_of_edges / hours_per_day) / n_years) # (sampled hours / hours per day) / project life
+    
+        # --- Build new profile ---
+        new_profile = []
+    
+        for year in range(n_years):
+            year_start = year * hours_per_year
+            for d in range(days_per_year):
+                # Spread days evenly across the year
+                day_idx = int((d + 0.5) * hours_per_year / days_per_year / hours_per_day)
+                hour_idx = year_start + day_idx * hours_per_day
+                new_profile.extend(full_profile[hour_idx:hour_idx + hours_per_day])
 
         self.flows.value = new_profile[:self.number_of_edges]
         return
 
+    # def _get_year_change_indices(self):
+    #     timesteps = self.number_of_edges
+    #     num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
+    #     total_length = 8760 * num_years
+
+    #     set_size = self.parameters_df["set_size"]
+    #     set_number = self.parameters_df["set_number"]
+    #     n_sets = int(np.ceil(timesteps / set_size))
+    #     gap = int(total_length / (n_sets * set_size)) * set_size
+    #     offset = set_size * set_number
+
+    #     self.year_change_indices = []
+    #     last_year = -1
+
+    #     for counter1 in range(n_sets):
+    #         old_loc_0 = offset + gap * counter1
+    #         new_loc_0 = set_size * counter1
+    #         current_year = old_loc_0 // 8760
+    #         if current_year != last_year:
+    #             self.year_change_indices.append(new_loc_0)
+    #             last_year = current_year
+
+    #     return self.year_change_indices
+    
     def _get_year_change_indices(self):
-        timesteps = self.number_of_edges
-        num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
-        total_length = 8760 * num_years
-
-        set_size = self.parameters_df["set_size"]
-        set_number = self.parameters_df["set_number"]
-        n_sets = int(np.ceil(timesteps / set_size))
-        gap = int(total_length / (n_sets * set_size)) * set_size
-        offset = set_size * set_number
-
-        self.year_change_indices = []
-        last_year = -1
-
-        for counter1 in range(n_sets):
-            old_loc_0 = offset + gap * counter1
-            new_loc_0 = set_size * counter1
-            current_year = old_loc_0 // 8760
-            if current_year != last_year:
-                self.year_change_indices.append(new_loc_0)
-                last_year = current_year
-
+        hours_per_day = 24
+        num_years = self.num_years
+        days_per_year = int((self.number_of_edges / hours_per_day) / num_years)
+        hours_per_year = days_per_year * hours_per_day
+        self.year_change_indices = [i * hours_per_year for i in range(num_years)]
         return self.year_change_indices
 
     def component_size(self):

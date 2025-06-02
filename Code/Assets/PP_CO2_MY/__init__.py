@@ -116,31 +116,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
             edge.attach_target_node(
                 self.network.extract_node(target_node_location, target_node_type, target_node_time)
             )
-    
         edge.flow = yearly_emissions_sum
-        # edge.conversion_fun = None
-        # edge.conversion_fun_params = {}
-
-     # def build_emissions_edges(self, edge_number):
-     #     '''Build edges per timestep for emissions'''
-     #     source_node_type = self.source_node_type
-     #     target_node_type = self.target_node_type_2
-     #     source_node_location = self.source_node_location
-     #     target_node_location = source_node_location
-     #     source_node_time = self.source_node_times[edge_number]
-     #     target_node_time = self.target_node_times[edge_number]
-     #     new_edge = Edge_STEVFNs()
-     #     self.edges += [new_edge]
-     #     if source_node_type != "NULL":
-     #         new_edge.attach_source_node(self.network.extract_node(
-     #             source_node_location, source_node_type, source_node_time))
-     #     if target_node_type != "NULL":
-     #         new_edge.attach_target_node(self.network.extract_node(
-     #             target_node_location, target_node_type, target_node_time))
-     #     new_edge.flow = self.flows[edge_number]
-     #     new_edge.conversion_fun = self.conversion_fun_2
-     #     new_edge.conversion_fun_params = self.conversion_fun_params_2
- 
 
     def build_edge_3(self):
         '''Build edge to limit hourly peak generation'''
@@ -164,30 +140,38 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         new_edge.conversion_fun_params = self.conversion_fun_params_3
         return
 
-    def _get_year_change_indices(self):
-        timesteps = self.number_of_edges
-        num_years = self.num_years
-        total_length = 8760 * num_years  # total length of full-resolution data
-        set_size = 24
-        set_number = 0
-        # set_size = self.parameters_df["set_size"]
-        # set_number = self.parameters_df["set_number"]
-        n_sets = int(np.ceil(timesteps / set_size))
-        gap = int(total_length / (n_sets * set_size)) * set_size
-        offset = set_size * set_number
+    # def _get_year_change_indices(self):
+    #     timesteps = self.number_of_edges
+    #     num_years = self.num_years
+    #     total_length = 8760 * num_years  # total length of full-resolution data
+    #     set_size = 24
+    #     set_number = 0
+    #     # set_size = self.parameters_df["set_size"]
+    #     # set_number = self.parameters_df["set_number"]
+    #     n_sets = int(np.ceil(timesteps / set_size))
+    #     gap = int(total_length / (n_sets * set_size)) * set_size
+    #     offset = set_size * set_number
     
-        self.year_change_indices = []
-        last_year = -1  # initialize to a value that will never match first year
+    #     self.year_change_indices = []
+    #     last_year = -1  # initialize to a value that will never match first year
     
-        for counter1 in range(n_sets):
-            old_loc_0 = offset + gap * counter1
-            new_loc_0 = set_size * counter1
+    #     for counter1 in range(n_sets):
+    #         old_loc_0 = offset + gap * counter1
+    #         new_loc_0 = set_size * counter1
     
-            current_year = old_loc_0 // 8760  # get artificial year index
-            if current_year != last_year:
-                self.year_change_indices.append(new_loc_0)
-                last_year = current_year
+    #         current_year = old_loc_0 // 8760  # get sampled year index
+    #         if current_year != last_year:
+    #             self.year_change_indices.append(new_loc_0)
+    #             last_year = current_year
 
+    #     return self.year_change_indices
+    
+    def _get_year_change_indices(self):
+        hours_per_day = 24
+        num_years = self.num_years
+        days_per_year = int((self.number_of_edges / hours_per_day) / num_years)
+        hours_per_year = days_per_year * hours_per_day
+        self.year_change_indices = [i * hours_per_year for i in range(num_years)]
         return self.year_change_indices
     
     def _update_usage_constants(self):
@@ -196,7 +180,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         Supports scalar or yearly values, applies NPV and simulation scaling.
         """
         # Compute simulation length and NPV adjustment
-        simulation_factor = 8760 / self.network.system_structure_properties["simulated_timesteps"]
+        sampled_days = int((self.number_of_edges / 24) / self.num_years) # sampled days per year in horizon
+        simulation_factor = 365 / sampled_days
         discount_rate = self.network.system_parameters_df.loc["discount_rate", "value"]
         project_life_hours = self.network.system_parameters_df.loc["project_life", "value"]
         num_years = int(np.ceil(project_life_hours / 8760))

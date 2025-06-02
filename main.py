@@ -22,7 +22,7 @@ from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
 
 #### Define Input Files ####
-case_study_name = "MEX_30y_MY"
+case_study_name = "MEX_30y_MY_4320"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
 # case_study_name = "toy_wind_PP"
 
@@ -43,13 +43,13 @@ network_structure_filename = os.path.join(case_study_folder, "Network_Structure.
 network_structure_df = pd.read_csv(network_structure_filename)
 
 ### Build Network ###
-start_time = time.time()
+start_time_0 = time.time()
 
 my_network = Network_STEVFNs()
 my_network.build(network_structure_df)
 
 end_time = time.time()
-print("Time taken to build network = ", end_time - start_time, "s")
+print("Time taken to build network = ", end_time - start_time_0, "s")
 total_df = pd.DataFrame()
 total_df_1 = pd.DataFrame()
 
@@ -82,14 +82,14 @@ for counter1 in range(len(scenario_folders_list)):
 
     ######## Print Results ############
     print("Scenario: ", my_network.scenario_name)
-    print("Time taken to solve problem = ", end_time - start_time, "s")
+    print("Time taken to build, update and solve problem = ", end_time - start_time_0, "s")
     print(my_network.problem.solution.status)
     if my_network.problem.value == float("inf"):
         continue
     print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
     for asset in my_network.assets:
         if asset.asset_name == "CO2_Budget_MY":
-            print("Total emissions = ", asset.asset_size(), "MtCO2e")
+            print("Total emissions = ", [float(f"{i:.3g}") for i in asset.asset_size()], "MtCO2e")
 
 if my_network.problem.value != float("inf"):
       
