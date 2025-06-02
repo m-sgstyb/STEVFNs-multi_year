@@ -1,0 +1,6 @@
+Asset_Number,Asset_Class,Location_1,Location_2,Asset_Type
+0,CO2_Budget_MY,0,0,1
+1,RE_PV_MY,0,0,2
+2,RE_WIND_MY,0,0,1
+3,PP_CO2_MY,0,0,1
+4,EL_Demand_MY,0,0,4
