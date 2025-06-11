@@ -20,6 +20,82 @@ import pandas as pd
 import numpy as np
 
 
+def export_scenario_results(my_network, scenario_name):
+    num_years = my_network.assets[0].num_years
+    years = list(range(1, num_years + 1))
+    print(len(years), len([0] * num_years))
+    # Initialize base dictionary
+    data = {
+        "year": years,
+        "scenario": [scenario_name] * num_years,
+        "Annual_Emissions": [0] * num_years,
+        "Peak_Annual_Demand": [0] * num_years,
+        "Total_Annual_Demand": [0] * num_years,
+        "Peak_Annual_Fossil_Gen_GWp": [0] * num_years,
+        "Total_Annual_Fossil_Gen_GWh": [0] * num_years,
+        "Annual_NPV_OPEX_PP_BUSD": [0] * num_years,
+    }
+
+    for asset in my_network.assets[1:]:
+        name = asset.asset_name
+
+        # Demand asset
+        if hasattr(asset, "peak_demand"):
+            data["Peak_Annual_Demand"] = asset.peak_demand()
+            data["Total_Annual_Demand"] = asset.asset_size()
+                  
+        # Fossil plant with emissions
+        if hasattr(asset, "get_yearly_emissions"):
+            data["Annual_Emissions"] = asset.get_yearly_emissions()
+            data["Peak_Annual_Fossil_Gen_GWp"] = asset.peak_generation()
+            data["Total_Annual_Fossil_Gen_GWh"] = [sum(year) for year in asset.get_yearly_flows()[:num_years]]
+            data["Annual_NPV_OPEX_PP_BUSD"] = asset.get_yearly_usage_costs()
+
+        # Renewable asset
+        if hasattr(asset, "cumulative_new_installed"):
+            flows = getattr(asset.flows, "value", asset.flows)
+            cumulative_installed = asset.cumulative_new_installed.value
+            existing_capacity_val = asset.conversion_fun_params["existing_capacity"].value
+
+            payments_M = getattr(asset, "payments_M", None)
+            if payments_M is not None:
+                payments = getattr(payments_M, "value", payments_M)
+                if payments is not None:
+                    annual_payments = np.sum(payments, axis=1).tolist()
+                else:
+                    annual_payments = [0] * num_years
+            else:
+                annual_payments = [0] * num_years
+
+            data[f"{name}_new_annual_installed_GWp"] = flows.tolist()
+            data[f"{name}_total_capacity_GWp"] = (cumulative_installed + existing_capacity_val).tolist()
+            data[f"{name}_annual_payments_BUSD"] = annual_payments
+            
+    for key, val in data.items():
+        if hasattr(val, '__len__'):
+            print(f"{key}: length {len(val)}")
+        else:
+            print(f"{key}: scalar value")
+    time_series_df = pd.DataFrame(data)
+
+    # Cost summary
+    system_cost = my_network.problem.value
+    cost_summary = []
+    for asset in my_network.assets[1:]:
+        cost_val = getattr(asset.cost, "value", asset.cost)
+        cost_summary.append({
+            "scenario": scenario_name,
+            "total_system_cost": system_cost,
+            "asset_name": asset.asset_name,
+            "asset_cost": cost_val,
+        })
+
+    summary_df = pd.DataFrame(cost_summary)
+
+    return time_series_df, summary_df
+
+
+
 def export_results(my_network):
     '''
     This function exports a DataFrame with asset sizes and costs, total throughout
@@ -51,22 +127,20 @@ def export_results(my_network):
             costs_df.insert(0, f'{name}_{loc1}_G$', [my_network.assets[asset].cost.value])
             sizes_df.insert(0, f'{name}_{loc1}_GWh', [my_network.assets[asset].asset_size()])        
             
-        elif name == 'RE_PV_Rooftop_Lim' or name == 'RE_PV_Openfield_Lim' or name == 'RE_WIND_Onshore_Lim' \
-            or name == 'RE_WIND_Offshore_Lim' or name == 'RE_WIND_Onshore_Existing' or name == 'RE_PV_Openfield_Exising':
+        elif name == 'RE_PV_MY' or name == 'RE_WIND_MY':
             loc1 = my_network.assets[asset].target_node_location
             costs_df.insert(0, f'{name}_{loc1}_G$', [my_network.assets[asset].cost.value])
-            sizes_df.insert(0, f'{name}_{loc1}_GW', [my_network.assets[asset].asset_size()])
+            sizes_df.insert(0, f'{name}_{loc1}_GWp', [my_network.assets[asset].asset_size()])
 
-        elif name == 'EL_Demand' or name == 'HTH_Demand':
+        elif name == 'EL_Demand':
             loc1 = my_network.assets[asset].node_location
-            costs_df.insert(0, f'{name}_{loc1}_G$', [my_network.assets[asset].cost.value])
-            sizes_df.insert(0, f'{name}_{loc1}_GWh', [my_network.assets[asset].asset_size()])
+            sizes_df.insert(0, f'{name}_{loc1}_GWp', [my_network.assets[asset].asset_size()])
             
         elif name == 'EL_Transport':
             loc1 = my_network.assets[asset].asset_structure["Location_1"]
             loc2 = my_network.assets[asset].asset_structure["Location_2"]
             costs_df.insert(0, f'{name}_{loc1}-{loc2}_G$', [my_network.assets[asset].cost.value])
-            sizes_df.insert(0, f'{name}_{loc1}-{loc2}_GW', [my_network.assets[asset].asset_size()])
+            sizes_df.insert(0, f'{name}_{loc1}-{loc2}_GWp', [my_network.assets[asset].asset_size()])
         elif name == 'NH3_Transport':
             loc1 = my_network.assets[asset].asset_structure["Location_1"]
             loc2 = my_network.assets[asset].asset_structure["Location_2"]
@@ -102,118 +176,6 @@ def export_results(my_network):
     
     return costs_df
 
-def get_total_data_rounded(my_network, location_parameters_df, asset_parameters_df):
-    '''
-    This function exports data for the case study being run for assets per location
-    including asset size, asset cost and the country(ies) total emissions per scenario
-    
-    It needs to be run within the scenario loop and concatenated to another dataframe
-    to export all results in a case study together.
-
-    Parameters
-    ----------
-    my_network : STEVFNs Network
-        Network object created based on the assets in a network structure, timesteps
-        and other parameters defined in STEVFNs.
-    location_parameters_df : DataFrame
-        Obtained by reading Location_Parameters.csv file in a case study, coded in main.
-    asset_parameters_df : DataFrame
-        Obtained by reading Asset_Parameters.csv file in a case study, coded in main.
-
-    Returns
-    -------
-    total_data_df : DataFrame
-        Results compiled for sets of countries in a case study (either autarky or
-        collaboration) for size, cost, and emissions. Rounds the values to one decimal
-
-    '''
-    location_names = list(location_parameters_df["location_name"])
-    loc_names_set_list = list(set(asset_parameters_df["Location_1"]).union(set(asset_parameters_df["Location_2"])))
-    loc_names_list = ["",]*4
-    for counter1 in range(len(loc_names_set_list)):
-        loc_names_list[counter1] = location_names[loc_names_set_list[counter1]]
-    
-    total_data_columns = ["country_1",
-                  "country_2",
-                  "country_3",
-                  "country_4",
-                  "collaboration_emissions",
-                  "technology_cost",
-                  "technology_size",
-                  "technology_name",]
-    total_data_df = pd.DataFrame(columns = total_data_columns)
-    
-    # Hardcoded CO2_Budget Asset always in Network Structure as asset 0
-    collaboration_emissions =  my_network.assets[0].asset_size()
-    loc_names_set = set()
-    
-    storage_assets = ['BESS', 'NH3_Storage']
-    renewable_assets = ['RE_PV_Rooftop_Lim', 'RE_PV_Openfield_Lim', 'RE_WIND_Onshore_Lim',
-                        'RE_WIND_Offshore_Lim', 'RE_WIND_Onshore_Existing', 'RE_PV_Openfield_Exising']
-    demand_assets = ['EL_Demand', 'HTH_Demand']
-    transport_assets= ['EL_Transport', 'NH3_Transport']
-    
-    for counter1 in range(1,len(my_network.assets)):
-        asset = my_network.assets[counter1]
-        name = asset.asset_name
-        
-        ### Exceptions in formatting or extracting results per type of asset ###
-        if name in storage_assets:
-            loc1 = asset.asset_structure["Location_1"]
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-            
-        elif name in renewable_assets:
-            loc1 = asset.target_node_location
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost =  asset.cost.value
-            technology_size = asset.asset_size()
-
-        elif name in demand_assets:
-            loc1 = asset.node_location
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-            
-        elif name in transport_assets:
-            loc1 = asset.asset_structure["Location_1"]
-            loc2 = asset.asset_structure["Location_2"]
-            loc_name_1 = location_names[loc1]
-            loc_name_2 = location_names[loc2]
-            loc_names_set.add(loc_name_1)
-            loc_names_set.add(loc_name_1)
-            technology_name = name + r"_[" + loc_name_1 + r"-" + loc_name_2 + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-        ### The rest of the assets, in general ###
-        else:
-            loc1 = asset.asset_structure["Location_1"]
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-        
-        N = np.ceil(my_network.system_parameters_df.loc["project_life", "value"]/8760) #number of years for the project
-        t_df = pd.DataFrame({"country_1": [loc_names_list[0]],
-                             "country_2": [loc_names_list[1]],
-                             "country_3": [loc_names_list[2]],
-                             "country_4": [loc_names_list[3]],
-                             "collaboration_emissions_MtCO2e/y": [round(collaboration_emissions/N, 1)],# Number is annualized, number is converted from ktCO2e to MtCO2e
-                             "technology_cost_G$/y": [round(technology_cost/N, 1)],# Number is annualized
-                             "technology_size": [technology_size],
-                             "technology_name": [technology_name],  
-            })
-        total_data_df = pd.concat([total_data_df, t_df], ignore_index=True)
-    return total_data_df
-
 
 def get_total_data(my_network, location_parameters_df, asset_parameters_df):
     '''
@@ -241,20 +203,19 @@ def get_total_data(my_network, location_parameters_df, asset_parameters_df):
     '''
     location_names = list(location_parameters_df["location_name"])
     loc_names_set_list = list(set(asset_parameters_df["Location_1"]).union(set(asset_parameters_df["Location_2"])))
-    loc_names_list = ["",]*4
+    loc_names_list = ["",]*3
     for counter1 in range(len(loc_names_set_list)):
         loc_names_list[counter1] = location_names[loc_names_set_list[counter1]]
     
     total_data_columns = ["country_1",
                   "country_2",
                   "country_3",
-                  "country_4",
                   "collaboration_emissions",
                   "technology_cost",
                   "technology_name",]
     total_data_df = pd.DataFrame(columns = total_data_columns)
     
-    collaboration_emissions =  my_network.assets[0].asset_size()
+    collaboration_emissions =  my_network.assets[0].asset_size() # this is now a list of self.num_years elements
     loc_names_set = set()
     
     # Define asset types to distinguish formatting
@@ -283,7 +244,7 @@ def get_total_data(my_network, location_parameters_df, asset_parameters_df):
             loc_names_set.add(loc_name)
             technology_name = name + r"_[" + loc_name + r"]"
             technology_cost =  asset.cost.value
-            technology_size = asset.asset_size()
+            technology_size = asset.asset_size() # this is now a list of self.num_years elements
 
         elif name in demand_assets:
             loc1 = asset.node_location

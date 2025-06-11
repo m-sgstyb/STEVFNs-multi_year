@@ -12,7 +12,6 @@ import os
 import numpy as np
 import pandas as pd
 import cvxpy as cp
-from amortization.amount import calculate_amortization_amount as amort
 from ..Base_Assets import Asset_STEVFNs
 from ...Network import Edge_STEVFNs
 
@@ -274,17 +273,15 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
     
         raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
         self.payments_M = cp.multiply(raw_payments, valid_mask)
+        self.payments_per_year = cp.sum(self.payments_M, axis=1).value
     
-        # --- NEW: Time scaling to represent full project horizon ---
-        # Total real hours over the project
-        total_hours = project_years * 365 * 24
+        # --- NEW EDITED: Time scaling to represent full project horizon, not just sampled data ---
     
         # Sampled hours in the optimization
-        sampled_hours = self.number_of_edges  # Initiated timesteps modelled in asset structure
-    
-        time_scaling_factor = total_hours / sampled_hours
-    
-        return cp.sum(self.payments_M) * time_scaling_factor
+        # sampled_hours_in_year = self.number_of_edges / self.num_years  # Initiated timesteps modelled in asset structure
+        # time_scaling_factor = 8760 / sampled_hours_in_year
+        
+        return cp.sum(self.payments_M) #* time_scaling_factor
     
     def _update_parameters(self):
         """Updates model parameters efficiently by processing cost projections,

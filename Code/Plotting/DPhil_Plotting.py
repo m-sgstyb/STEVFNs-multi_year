@@ -427,7 +427,12 @@ def plot_yearly_flows_stacked(network, output_folder):
     
             for flows in flows_list:
                 if year < len(flows):
-                    tech_total += np.array(flows[year])
+                    flow_year = np.array(flows[year])
+                    if flow_year.shape != demand.shape:
+                        print(f"⚠️ Flow shape mismatch in year {year + 1} for tech {tech}: "
+                              f"expected {demand.shape}, got {flow_year.shape}")
+                    tech_total += flow_year
+
     
             # Split into used (up to remaining demand) and excess (above demand)
             used = np.minimum(tech_total, remaining_demand)

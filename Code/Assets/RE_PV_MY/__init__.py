@@ -12,7 +12,6 @@ import os
 import numpy as np
 import pandas as pd
 import cvxpy as cp
-from amortization.amount import calculate_amortization_amount as amort
 from ..Base_Assets import Asset_STEVFNs
 from ...Network import Edge_STEVFNs
 
@@ -304,14 +303,14 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
     
         # --- NEW: Time scaling to represent full project horizon ---
         # Total real hours over the project
-        total_hours = project_years * 365 * 24
+        # total_hours = project_years * 365 * 24
     
-        # Sampled hours in the optimization
-        sampled_hours = self.number_of_edges  # Initiated timesteps modelled in asset structure
+        # # Sampled hours in the optimization
+        # sampled_hours = self.number_of_edges  # Initiated timesteps modelled in asset structure
     
-        time_scaling_factor = total_hours / sampled_hours
+        # time_scaling_factor = total_hours / sampled_hours
     
-        return cp.sum(self.payments_M) * time_scaling_factor
+        return cp.sum(self.payments_M) #* time_scaling_factor
 
     
     def _update_parameters(self):
@@ -333,42 +332,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self._load_parameters_df(asset_type)
         self._update_parameters()
         return
-    
-    # def _load_RE_profile(self):
-    #     """This function reads file and updates self.gen_profile 
-    #     This is the old version, with evenly spaced sets for one year
-    #     """
-    #     lat_lon_df = self.network.lat_lon_df.iloc[self.target_node_location]
-    #     lat = lat_lon_df["lat"]
-    #     lat = np.int64(np.round((lat) / 0.5)) * 0.5
-    #     lat = min(lat,90.0)
-    #     lat = max(lat,-90.0)
-    #     LAT = "{:0.1f}".format(lat)
-    #     lon = lat_lon_df["lon"]
-    #     lon = np.int64(np.round((lon) / 0.625)) * 0.625
-    #     lon = min(lon, 179.375)
-    #     lon = max(lon, -180.0)
-    #     LON = str(lon)
-    #     RE_TYPE = self.parameters_df["RE_type"]
-    #     profile_folder = os.path.join(self.parameters_folder, "profiles", RE_TYPE, r"lat"+LAT)
-    #     profile_filename = RE_TYPE + r"_lat" + LAT + r"_lon" + LON + r".csv"
-    #     profile_filename = os.path.join(profile_folder, profile_filename)
-    #     with open(profile_filename, encoding='utf-8-sig') as f:
-    #         full_profile = np.loadtxt(f)
-    #     set_size = self.parameters_df["set_size"]
-    #     set_number = self.parameters_df["set_number"]
-    #     n_sets = int(np.ceil(self.number_of_edges/set_size))
-    #     gap = int(len(full_profile) / (n_sets * set_size)) * set_size
-    #     offset = set_size * set_number
-    #     new_profile = np.zeros(int(n_sets * set_size))
-    #     for counter1 in range(n_sets):
-    #         old_loc_0 = offset + gap*counter1
-    #         old_loc_1 = old_loc_0 + set_size
-    #         new_loc_0 = set_size * counter1
-    #         new_loc_1 = new_loc_0 + set_size
-    #         new_profile[new_loc_0 : new_loc_1] = full_profile[old_loc_0 : old_loc_1]
-    #     self.gen_profile.value = new_profile[:self.number_of_edges]
-    #     return
     
     def _load_RE_profile(self):
         """Loads renewable profile and resamples to representative days per year"""
@@ -399,7 +362,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         n_years = total_hours // hours_per_year # number of years in project
         hours_per_day = 24
         days_per_year = int((self.number_of_edges / hours_per_day) / n_years) # (sampled hours / hours per day) / project life
-    
+        # print("Days per year", days_per_year)
         # --- Build new profile ---
         new_profile = []
     
@@ -444,31 +407,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         asset_size = self.size()
         asset_identity = self.asset_name + r"_" + self.parameters_df["RE_type"] + r"_location_" + str(self.target_node_location)
         return {asset_identity: asset_size}
-    
-    # def _get_year_change_indices(self):
-    #     """ Sampled year change indices in new profile when I was sampling over whole project"""
-    #     timesteps = self.number_of_edges
-    #     num_years = self.num_years
-    #     total_length = 8760 * num_years
-    #     set_size = 24
-    #     set_number = 0
-    #     n_sets = int(np.ceil(timesteps / set_size))
-    #     gap = int(total_length / (n_sets * set_size)) * set_size
-    #     offset = set_size * set_number
-    
-    #     year_change_indices = []
-    #     last_year = -1
-    
-    #     for counter1 in range(n_sets):
-    #         old_loc_0 = offset + gap * counter1
-    #         new_loc_0 = set_size * counter1
-    
-    #         current_year = old_loc_0 // 8760
-    #         if current_year != last_year:
-    #             year_change_indices.append(new_loc_0)
-    #             last_year = current_year
-    
-    #     return year_change_indices
     
     def _get_year_change_indices(self):
         hours_per_day = 24

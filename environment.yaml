@@ -1,14 +1,40 @@
-name: dphil-clean
+name: monica_stevfns
 channels:
   - conda-forge
   - mosek
-
 dependencies:
-- numpy
-- pandas
-- cvxpy
-- clarabel
-- python=3.10.12
-- spyder
-- matplotlib
+  - atlite
+  - bottleneck
+  - cdsapi=0.7.2
+  - cvxpy
+  - dask[version='>=2021.10.0']
+  - geopandas
+  - matplotlib
+  - netcdf4
+  - numexpr
+  - numpy
+  - pandas[version='>=0.25']
+  - pyproj[version='>=2.0']
+  - pytest
+  - rasterio!=1.2.10
+  - requests
+  - scipy
+  - shapely
+  - toolz
+  - tqdm
+  - xarray[version='>=0.16.2']
+  - yaml
+  - geodatasets
+  - python
+  - mosek
+  - pwlf
+  - clarabel
+  - basemap
+  - plotly
+  - conda-forge::python-kaleido
+  - fiona
+  - dask-geopandas
+  - notebook
+  - seaborn
+  - openpyxl
 

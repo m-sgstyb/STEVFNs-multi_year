@@ -131,6 +131,20 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
             for start, end in zip(year_indices[:-1], year_indices[1:])
         ]
         return np.array(yearly_totals)
+    
+    def peak_demand(self):
+        """Returns yearly peak demand (hourly peak per modelled year)"""
+        if self.flows.value is None:
+            return None
+
+        year_indices = self._get_year_change_indices()
+        year_indices.append(len(self.flows.value))
+
+        yearly_totals = [
+            np.max(self.flows.value[start:end])
+            for start, end in zip(year_indices[:-1], year_indices[1:])
+        ]
+        return np.array(yearly_totals)
 
     def get_asset_sizes(self):
         asset_identity = f"{self.asset_name}_location_{self.node_location}"

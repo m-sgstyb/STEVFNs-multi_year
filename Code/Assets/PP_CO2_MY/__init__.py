@@ -102,6 +102,13 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         # Compute total emissions
         yearly_emissions = self.conversion_fun_2(yearly_flows, self.conversion_fun_params_2)
         yearly_emissions_sum = cp.sum(yearly_emissions)
+        
+        # Scale emissions from sampled to full year
+        hours_per_day = 24
+        n_years = self.num_years
+        sampled_days = int((self.number_of_edges / hours_per_day) / n_years) # (sampled hours / hours per day) / project life
+        emission_scaling_factor = 365 / sampled_days
+        yearly_emissions_sum *= emission_scaling_factor
     
         # Create and connect the edge
         edge = Edge_STEVFNs()
@@ -139,32 +146,6 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         new_edge.conversion_fun = self.conversion_fun_3
         new_edge.conversion_fun_params = self.conversion_fun_params_3
         return
-
-    # def _get_year_change_indices(self):
-    #     timesteps = self.number_of_edges
-    #     num_years = self.num_years
-    #     total_length = 8760 * num_years  # total length of full-resolution data
-    #     set_size = 24
-    #     set_number = 0
-    #     # set_size = self.parameters_df["set_size"]
-    #     # set_number = self.parameters_df["set_number"]
-    #     n_sets = int(np.ceil(timesteps / set_size))
-    #     gap = int(total_length / (n_sets * set_size)) * set_size
-    #     offset = set_size * set_number
-    
-    #     self.year_change_indices = []
-    #     last_year = -1  # initialize to a value that will never match first year
-    
-    #     for counter1 in range(n_sets):
-    #         old_loc_0 = offset + gap * counter1
-    #         new_loc_0 = set_size * counter1
-    
-    #         current_year = old_loc_0 // 8760  # get sampled year index
-    #         if current_year != last_year:
-    #             self.year_change_indices.append(new_loc_0)
-    #             last_year = current_year
-
-    #     return self.year_change_indices
     
     def _get_year_change_indices(self):
         hours_per_day = 24
@@ -208,6 +189,32 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         # Assign value to pre-defined Parameter for static cost_fun
         self.cost_fun_params["usage_constant_1"].value = expanded_costs
 
+    def get_yearly_usage_costs(self):
+        """
+        Returns a list of yearly total usage payments (discounted), using hourly flows
+        and NPV-adjusted usage costs.
+        """
+        if "usage_constant_1" not in self.cost_fun_params:
+            raise ValueError("Usage cost not defined for this asset.")
+    
+        hourly_costs = self.cost_fun_params["usage_constant_1"].value  # shape: (number_of_edges,)
+        hourly_flows = self.flows.value  # same shape
+    
+        if hourly_costs is None or hourly_flows is None:
+            raise ValueError("Cost or flow values not set.")
+    
+        total_hourly_costs = hourly_costs * hourly_flows  # element-wise cost per hour
+    
+        # Final slicing using year_change_indices
+        year_indices = list(self.year_change_indices)
+    
+        yearly_costs = [
+            np.sum(total_hourly_costs[start:end])
+            for start, end in zip(year_indices[:-1], year_indices[1:])
+        ]
+    
+        return yearly_costs  # length = num_years
+
     
     def process_csv_values(self,values):
         """Method converts a comma-separated string to a NumPy array of floats or returns
@@ -226,21 +233,19 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         self._update_usage_constants()
         return
     
-    def peak_generation_per_year(self):
-        # Method gets the peak generation at each year
-        year_change_indices = self._get_year_change_indices()
-        peak_gen_list = []
-    
-        # Add the end of the flow array to the list to ensure complete range
-        year_change_indices.append(self.number_of_edges)
-    
-        for i in range(len(year_change_indices) - 1):
-            start = year_change_indices[i]
-            end = year_change_indices[i + 1]
-            peak_gen = cp.max(self.flows[start:end].value)
-            peak_gen_list.append(peak_gen.value)
+    def peak_generation(self):
+        """Returns yearly peak fossil generation (hourly peak per modelled year)"""
+        if self.flows.value is None:
+            return None
 
-        return np.array(peak_gen_list)
+        year_indices = self._get_year_change_indices()
+        year_indices.append(len(self.flows.value))
+
+        yearly_totals = [
+            np.max(self.flows.value[start:end])
+            for start, end in zip(year_indices[:-1], year_indices[1:])
+        ]
+        return np.array(yearly_totals)
     
     def get_asset_sizes(self):
         # Returns the size of the asset as a dict #
@@ -248,13 +253,12 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         asset_identity = self.asset_name + r"_location_" + str(self.node_location)
         return {asset_identity: asset_size}
     
-    def get_emissions_from_PP(self):
-        # debugging and testing method for results
-        annual_emissions = np.zeros(shape=(5,))
-        for edge in self.edges:
-            if edge.target_node.node_type == 'CO2_Budget':
-                annual_emissions += (edge.flow.value * self.conversion_fun_params_2["CO2_emissions_factor"].value)
-                
+    def get_yearly_emissions(self):
+        # define indices for emissions edges
+        emissions_edges_start = self.number_of_edges
+        emissions_edges_end = self.number_of_edges + self.num_years
+        annual_emissions = [-self.edges[i].flow.value for i in range(emissions_edges_start,
+                                                                    emissions_edges_end)]
         return annual_emissions
     
     def get_yearly_flows(self):
