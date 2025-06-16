@@ -2,9 +2,8 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Base path (adjust if needed)
-base_path = "/Users/mnsgs/Desktop/STEVFNs-DPhil-MSB"
-
+# base_path = "/Users/mnsgs/Desktop/STEVFNs-DPhil-MSB"
+base_path = os.path.dirname(__file__)
 
 case_study_path = os.path.join(base_path, "Data", "Case_Study")
 scenario = "linear_red_2055"
