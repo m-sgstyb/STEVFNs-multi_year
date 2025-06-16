@@ -3,12 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Base path (adjust if needed)
-base_path = os.path.dirname(__file__)
+base_path = "/Users/mnsgs/Desktop/STEVFNs-DPhil-MSB"
+
+
 case_study_path = os.path.join(base_path, "Data", "Case_Study")
-scenario = "linear_red"
+scenario = "linear_red_2055"
 
 # Sample sizes and corresponding total hours
-sample_days = [6, 12, 24, 48, 72, 96, 139, 183]
+sample_days = [6, 12, 24, 48, 72, 96, 139, 161, 183]
 total_hours = [d * 24 * 30 for d in sample_days]
 
 # Store data
@@ -36,7 +38,7 @@ for hrs in total_hours:
 # Plot Solar PV
 plt.figure(figsize=(10, 5))
 for hrs, series in sorted(pv_by_year.items()):
-    plt.plot(series.index, series.values, label=f"{hrs//24} days/year")
+    plt.plot(series.index, series.values, label=f"{hrs//24//30} days/year")
 plt.title("Annual Installed PV Capacity (GWp)")
 plt.xlabel("Year")
 plt.ylabel("Installed PV Capacity (GWp)")
@@ -48,7 +50,7 @@ plt.show()
 # Plot Wind
 plt.figure(figsize=(10, 5))
 for hrs, series in sorted(wind_by_year.items()):
-    plt.plot(series.index, series.values, label=f"{hrs//24} days/year")
+    plt.plot(series.index, series.values, label=f"{hrs//24//30} days/year")
 plt.title("Annual Installed Wind Capacity (GWp)")
 plt.xlabel("Year")
 plt.ylabel("Installed Wind Capacity (GWp)")
@@ -64,7 +66,7 @@ total_wind = {hrs: series.sum() for hrs, series in wind_by_year.items()}
 
 # Convert to DataFrame for plotting
 summary_df = pd.DataFrame({
-    'Sample Days per Year': [hrs//24 for hrs in total_pv.keys()],
+    'Sample Days per Year': [hrs//24//30 for hrs in total_pv.keys()],
     'PV Total Installed (GWp)': list(total_pv.values()),
     'Wind Total Installed (GWp)': list(total_wind.values())
 }).sort_values(by='Sample Days per Year')
@@ -80,11 +82,36 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
-Let me know if you'd like to add percentage change annotations, error bands, or merge this with runtime plots.
 
 
+#
+reference_hrs = 183 * 24 * 30
+reference_pv = pv_by_year[reference_hrs]
+reference_total = reference_pv.sum()
+for hrs, series in pv_by_year.items():
+    if hrs == reference_hrs:
+        continue  # skip the reference
+    sample_total = series.sum()
+    percent_error = abs(sample_total - reference_total) / reference_total * 100
 
+    plt.figure(figsize=(10, 5))
+    plt.plot(series.index, series.values, label=f'{hrs//24//30} days/year', color='blue')
+    plt.plot(reference_pv.index, reference_pv.values, label='183 days/year (ref)', color='black', linestyle='--')
 
+    # Interpolate reference to match x-axis if needed
+    aligned_ref = reference_pv.reindex(series.index).fillna(method='ffill')
+
+    # Calculate absolute difference
+    error = abs(series.values - aligned_ref.values)
+    plt.fill_between(series.index, series.values, aligned_ref.values, color='blue', alpha=0.3, label='Error vs ref')
+
+    plt.title(f"PV Capacity: {hrs//24//30} vs 183 Days per Year. % Error: {percent_error:.2f}%")
+    plt.xlabel("Year")
+    plt.ylabel("Installed PV Capacity (GWp)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 
 
