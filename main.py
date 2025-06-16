@@ -9,12 +9,9 @@ Adapted by:
 """
 
 import pandas as pd
-import numpy as np
 import time
 import os
 import cvxpy as cp
-from collections import defaultdict
-import matplotlib.pyplot as plt
 from Code.Network.Network import Network_STEVFNs
 from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
