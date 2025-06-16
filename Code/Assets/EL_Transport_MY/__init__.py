@@ -32,7 +32,8 @@ class EL_Transport_MY_asset(Asset_STEVFNs):
         return conversion_factor * flows
     
     def build_cost(self):
-        '''calculate amortised and discounted payments for this asset see coments below '''
+        '''calculate amortised and discounted payments for this asset'''
+        self.cost = self._get_amortised_sizing_cost() + self._get_discounted_usage_cost()
         return
     
     def __init__(self):
@@ -45,16 +46,37 @@ class EL_Transport_MY_asset(Asset_STEVFNs):
     def define_structure(self, asset_structure):
         self.asset_structure = asset_structure
         self.source_node_location = asset_structure["Location_1"]
-        self.source_node_times = np.arange(asset_structure["Start_Time"],
-                                           asset_structure["End_Time"],
+        # Define node times with delay of operation 10 years ahead of start_time
+        self.source_node_times = np.arange(asset_structure["Start_Time"] + 87600, 
+                                           asset_structure["End_Time"], 
                                            asset_structure["Period"])
         self.target_node_location = asset_structure["Location_2"]
-        self.target_node_times = np.arange(asset_structure["Start_Time"],
-                                           asset_structure["End_Time"],
+        self.target_node_times = np.arange(asset_structure["Start_Time"] + 87600, 
+                                           asset_structure["End_Time"], 
                                            asset_structure["Period"])
+        self.number_of_edges = len(self.source_node_times)
         self.target_node_times = self.target_node_times + asset_structure["Transport_Time"]
         self.target_node_times = self.target_node_times % asset_structure["End_Time"]
+        self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
+        start_time = asset_structure["Start_Time"]
+        self.start_year = int(start_time // 8760)
         self.flows = cp.Variable(self.number_of_edges*2, nonneg = True)
+        return
+    
+    def build_edge(self, edge_number):
+        source_node_time = self.source_node_times[edge_number]
+        target_node_time = self.target_node_times[edge_number]
+        new_edge = Edge_STEVFNs()
+        self.edges += [new_edge]
+        if self.source_node_type != "NULL":
+            new_edge.attach_source_node(self.network.extract_node(
+                self.source_node_location, self.source_node_type, source_node_time))
+        if self.target_node_type != "NULL":
+            new_edge.attach_target_node(self.network.extract_node(
+                self.target_node_location, self.target_node_type, target_node_time))
+        new_edge.flow = self.flows[edge_number]
+        new_edge.conversion_fun = self.conversion_fun
+        new_edge.conversion_fun_params = self.conversion_fun_params
         return
     
     def build_edge_opposite(self, edge_number):
@@ -74,10 +96,53 @@ class EL_Transport_MY_asset(Asset_STEVFNs):
         return
     
     def build_edges(self):
-        super().build_edges()
-        for counter1 in range(self.number_of_edges):
+        for counter1 in self.source_node_times: #apply delay in operation according to Start_Time and End_Time
+            self.build_edge(counter1)
             self.build_edge_opposite(counter1)
         return
+    
+    def _get_amortised_sizing_cost(self):
+        interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
+        discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
+        asset_lifetime = 50
+        project_years = self.num_years
+
+        r = interest_rate
+        n = asset_lifetime
+        amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
+
+        sizing_constant = self.cost_fun_params["sizing_constant"].value
+        sizing_cost = sizing_constant * cp.max(self.flows)
+        annualised_payment = sizing_cost * amort_factor
+
+        discount_vector = [(1 + discount_rate) ** -i for i in range(self.start_year, min(self.start_year + n, project_years))]
+        return annualised_payment * sum(discount_vector)
+
+    def _get_discounted_usage_cost(self):
+        discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
+        usage_constant = self.cost_fun_params["usage_constant"].value
+        project_years = self.num_years
+
+        self._get_year_change_indices()
+        self.usage_costs = []
+        for y in range(project_years):
+            start_idx = self.year_change_indices[y]
+            end_idx = self.year_change_indices[y + 1] if y + 1 < len(self.year_change_indices) else self.number_of_edges
+            
+            forward_flow = cp.sum(self.flows[start_idx:end_idx])
+            reverse_start = self.number_of_edges + start_idx
+            reverse_end = self.number_of_edges + end_idx
+            reverse_flow = cp.sum(self.flows[reverse_start:reverse_end])
+            total_flow = forward_flow + reverse_flow
+
+            
+            # total_flow = cp.sum(self.flows[start_idx:end_idx]) + cp.sum(
+            #     self.flows[self.number_of_edges + start_idx : self.number_of_edges + end_idx]
+            # )
+            discounted_cost = (usage_constant * total_flow) / ((1 + discount_rate) ** y)
+            self.usage_costs.append(discounted_cost)
+
+        return cp.sum(self.usage_costs)
     
     def _update_distance(self):
         #Function that calculates approximate distance between the source and target nodes "as the bird flies"#
@@ -91,59 +156,48 @@ class EL_Transport_MY_asset(Asset_STEVFNs):
         R = 6.371 # in Mm radius of the earth
         self.distance = R * c # in Mm
         return 
+
+    def _get_year_change_indices(self):
+        hours_per_day = 24
+        num_years = self.num_years
+        days_per_year = int((self.number_of_edges / hours_per_day) / num_years)
+        hours_per_year = days_per_year * hours_per_day
+        self.year_change_indices = [i * hours_per_year for i in range(num_years)]
+        return self.year_change_indices
     
-    # Insert adaptation of cost functions to: 
-        # 1. amortise sizing_constant * cp.max(flows) (investment per capacity)
-        # 2. Bring amortisation to Net present value
-        # 3. Bring usage costs to net present value, not amortised
-        # 4. update_sizing and update_usage constants methods should not be required. 
-        # 5. Final total cost should be build in def build_cost(self)     
-     
-    # Insert _get_year_change_indices method as a helper method
-    # This should help determine the usage cost net present value
-    # If the hvdc cable starts operating in year 10, the trade in its first year operation should be NPV to 10 years before
-    # so self.flows[x:y] where x is the sampled first hour of year 10 and y is the last hour of the sampled year 10, the sum of that times the usage cost is the cost in that year. NPV it
-    # But be Careful: The flows in the other direction will just follow after the first direction 
-    # So the usage cost for that year should match that too. for example:
-        # If sampling 4320 hours over 30 years, therefore each year it takes 168 hours as representative
-        # the first year's hours for usage cost is [0:168] but that is only in the direction of location 1 to 2
-        # To add the usage for location 2 to 1 we need to slice [4320:4320+168]  
-    
-    def _update_sizing_constant(self):
-        N = np.ceil(self.network.system_parameters_df.loc["project_life", "value"]/self.parameters_df["lifespan"])
-        r = (1 + self.network.system_parameters_df.loc["discount_rate", "value"])**(-self.parameters_df["lifespan"]/8760)
-        NPV_factor = (1-r**N)/(1-r)
-        self.cost_fun_params["sizing_constant"].value = self.cost_fun_params["sizing_constant"].value * NPV_factor
-        return
-    
-    def _update_usage_constant(self):
-        simulation_factor = 8760/self.network.system_structure_properties["simulated_timesteps"]
-        N = np.ceil(self.network.system_parameters_df.loc["project_life", "value"]/8760)
-        r = (1 + self.network.system_parameters_df.loc["discount_rate", "value"])**-1
-        NPV_factor = (1-r**N)/(1-r)
-        self.cost_fun_params["usage_constant"].value = (self.cost_fun_params["usage_constant"].value * 
-                                                        NPV_factor * simulation_factor)
-        return
     
     def _update_parameters(self):
-        #update distance#
         self._update_distance()
-        #update parameters using self.parameters_df and self.distance#
         for parameter_name, parameter in self.cost_fun_params.items():
-            parameter.value = (self.parameters_df[parameter_name + r"_1"] + 
-                               self.parameters_df[parameter_name + r"_2"] * self.distance)
+            parameter.value = (
+                self.parameters_df[parameter_name + r"_1"] + self.parameters_df[parameter_name + r"_2"] * self.distance
+            )
         for parameter_name, parameter in self.conversion_fun_params.items():
-            parameter.value = 1 - (self.parameters_df[parameter_name + r"_1"] + 
-                               self.parameters_df[parameter_name + r"_2"] * self.distance)
-        #Update cost parameters based on NPV#
-        self._update_sizing_constant()
-        self._update_usage_constant()
-        return
+            parameter.value = 1 - (
+                self.parameters_df[parameter_name + r"_1"]
+                + self.parameters_df[parameter_name + r"_2"] * self.distance
+            )
     
-    # Add a get_yearly_flows method
-    # Where it gets, separately, the yearly flows in each direction
-    # this is for plotting purposes, remember to use the _get_year_change_indices method to help with this
+    def get_yearly_flows(self):
+        """
+        Returns a DataFrame with yearly flows for each direction of the transport asset.
+        Columns:
+            - forward_year_0, forward_year_1, ..., forward_year_n
+            - reverse_year_0, reverse_year_1, ..., reverse_year_n
+        Values are CVXPY expressions (or numbers if problem is solved).
+        """
+        self._get_year_change_indices()
+        project_years = self.num_years
+        data = {}
     
+        for y in range(project_years):
+            start_idx = self.year_change_indices[y]
+            end_idx = self.year_change_indices[y + 1] if y + 1 < len(self.year_change_indices) else self.number_of_edges
     
-
+            forward_flow = self.flows[start_idx:end_idx]
+            reverse_flow = self.flows[self.number_of_edges + start_idx : self.number_of_edges + end_idx]
     
+            data[f"forward_year_{y}"] = [cp.sum(forward_flow)]
+            data[f"reverse_year_{y}"] = [cp.sum(reverse_flow)]
+    
+        return pd.DataFrame(data)
