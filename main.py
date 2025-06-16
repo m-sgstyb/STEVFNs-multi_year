@@ -21,8 +21,10 @@ from Code.Results import Results
 
 
 #### Define Input Files ####
-# sample_sizes = [17280, 34560, 51840]
-sample_sizes = [4320]
+# sample_sizes = [51840, 69120, 131760]
+# sample_sizes = [4320, 8640, 17280, 34560]
+# sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
+sample_sizes = [115920]
 
 # case_study_name = "MEX_30y_MY_17280"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
@@ -31,6 +33,7 @@ sample_sizes = [4320]
 for sample in sample_sizes:
     
     case_study_name = f"MEX_30y_MY_{sample}"
+    
     
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
@@ -43,12 +46,18 @@ for sample in sample_sizes:
     
     ### Read Network Structure file ###
     network_structure_df = pd.read_csv(network_structure_filename)
-    
+    print("Read Network_Structure.csv")
     ### Build Network ###
     runtimes = []
     start_time_0 = time.time()
     my_network = Network_STEVFNs()
-    my_network.build(network_structure_df)
+    print("===================== Building Network =====================")
+    try:
+        my_network.build(network_structure_df)
+    except Exception as e:
+        print(f"Build failed: {e}")
+        print("Failed at time:", (time.time() - start_time_0)/ 60, "min")
+    
     
     end_time = time.time()
     build_time = end_time - start_time_0
@@ -62,6 +71,8 @@ for sample in sample_sizes:
     # for counter1 in range(1):
         # Read Input Files ###
         scenario_folder = scenario_folders_list[-1-counter1]
+        my_network.scenario_name = os.path.basename(scenario_folder)
+        print(f"===================== Starting Scenario {my_network.scenario_name} =====================")
         results_folder = os.path.join(scenario_folder, "Results")
         if not os.path.exists(results_folder):
             os.mkdir(results_folder)
@@ -77,10 +88,10 @@ for sample in sample_sizes:
         start_time = time.time()
         
         my_network.update(location_parameters_df, asset_parameters_df, system_parameters_df)
-        my_network.scenario_name = os.path.basename(scenario_folder)
         
         end_time = time.time()
         update_time = end_time - start_time
+        print("===================== Updating Network =====================")
         print("Time taken to update network = ", update_time, "s")
         
         ### Run Simulation ###
@@ -105,6 +116,7 @@ for sample in sample_sizes:
     
     
         ######## Print Results ############
+        print("====================== Results =========================")
         print("Scenario: ", my_network.scenario_name)
         print("Time taken to build, update and solve problem = ", full_time, "s")
         print(my_network.problem.solution.status)
@@ -123,7 +135,7 @@ for sample in sample_sizes:
     
         if my_network.problem.value != float("inf"):
               
-            yearly_path = os.path.join(case_study_folder, "all_flows_yearly.csv")
+            yearly_path = os.path.join(case_study_folder, f"all_flows_yearly_{scenario_name}.csv")
             Results.save_yearly_flows_to_csv(my_network, yearly_path)
             
             DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
@@ -138,9 +150,9 @@ for sample in sample_sizes:
         time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
         summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
     
-    emissions_df = pd.DataFrame(emissions_dict)
-    # Save to CSV
-    emissions_df.to_csv("all_scenarios_emissions.csv", index=False)
+        emissions_df = pd.DataFrame(emissions_dict)
+        # Save to CSV
+        emissions_df.to_csv(os.path.join(scenario_folder, "all_scenarios_emissions.csv"), index=False)
     print("Saved emissions reductions to 'all_scenarios_emissions.csv'")
     runtimes_df = pd.DataFrame(runtimes)
     runtimes_df.to_csv(os.path.join(case_study_folder, "runtimes.csv"), index=False)

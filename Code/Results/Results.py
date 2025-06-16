@@ -23,7 +23,7 @@ import numpy as np
 def export_scenario_results(my_network, scenario_name):
     num_years = my_network.assets[0].num_years
     years = list(range(1, num_years + 1))
-    print(len(years), len([0] * num_years))
+    # print(len(years), len([0] * num_years))
     # Initialize base dictionary
     data = {
         "year": years,
@@ -71,11 +71,11 @@ def export_scenario_results(my_network, scenario_name):
             data[f"{name}_total_capacity_GWp"] = (cumulative_installed + existing_capacity_val).tolist()
             data[f"{name}_annual_payments_BUSD"] = annual_payments
             
-    for key, val in data.items():
-        if hasattr(val, '__len__'):
-            print(f"{key}: length {len(val)}")
-        else:
-            print(f"{key}: scalar value")
+    # for key, val in data.items():
+    #     if hasattr(val, '__len__'):
+    #         print(f"{key}: length {len(val)}")
+    #     else:
+    #         print(f"{key}: scalar value")
     time_series_df = pd.DataFrame(data)
 
     # Cost summary
