@@ -56,3 +56,36 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+
+# Summarize total installed capacities
+total_pv = {hrs: series.sum() for hrs, series in pv_by_year.items()}
+total_wind = {hrs: series.sum() for hrs, series in wind_by_year.items()}
+
+# Convert to DataFrame for plotting
+summary_df = pd.DataFrame({
+    'Sample Days per Year': [hrs//24 for hrs in total_pv.keys()],
+    'PV Total Installed (GWp)': list(total_pv.values()),
+    'Wind Total Installed (GWp)': list(total_wind.values())
+}).sort_values(by='Sample Days per Year')
+
+# Plot as line chart
+plt.figure(figsize=(10, 5))
+plt.plot(summary_df['Sample Days per Year'], summary_df['PV Total Installed (GWp)'], marker='o', label='PV')
+plt.plot(summary_df['Sample Days per Year'], summary_df['Wind Total Installed (GWp)'], marker='s', label='Wind')
+plt.title("Total Installed Capacity vs Sample Size")
+plt.xlabel("Sample Days per Year")
+plt.ylabel("Total Installed Capacity (GWp)")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+Let me know if you'd like to add percentage change annotations, error bands, or merge this with runtime plots.
+
+
+
+
+
+
+
+
