@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 # base_path = "/Users/mnsgs/Desktop/STEVFNs-DPhil-MSB"
@@ -9,7 +10,7 @@ case_study_path = os.path.join(base_path, "Data", "Case_Study")
 scenario = "linear_red_2055"
 
 # Sample sizes and corresponding total hours
-sample_days = [6, 12, 24, 48, 72, 96, 139, 161, 183]
+sample_days = [6, 12, 24, 48, 72, 96, 120, 139, 161, 183]
 total_hours = [d * 24 * 30 for d in sample_days]
 
 # Store data
@@ -33,7 +34,8 @@ for hrs in total_hours:
     # Save by sample size
     pv_by_year[hrs] = pv_series.set_index('year').squeeze()
     wind_by_year[hrs] = wind_series.set_index('year').squeeze()
-
+    total_pv = pv_by_year[hrs].sum()
+    total_wind = wind_by_year[hrs].sum()
 # Plot Solar PV
 plt.figure(figsize=(10, 5))
 for hrs, series in sorted(pv_by_year.items()):
@@ -83,15 +85,18 @@ plt.tight_layout()
 plt.show()
 
 
-#
+# Plot error in installed capacities 
 reference_hrs = 183 * 24 * 30
 reference_pv = pv_by_year[reference_hrs]
-reference_total = reference_pv.sum()
+reference_pv_total = reference_pv.sum()
+
+reference_wind = wind_by_year[reference_hrs]
+reference_wind_total = reference_wind.sum()
 for hrs, series in pv_by_year.items():
     if hrs == reference_hrs:
         continue  # skip the reference
     sample_total = series.sum()
-    percent_error = abs(sample_total - reference_total) / reference_total * 100
+    percent_error = abs(sample_total - reference_pv_total) / reference_pv_total * 100 # Of total capacity
 
     plt.figure(figsize=(10, 5))
     plt.plot(series.index, series.values, label=f'{hrs//24//30} days/year', color='blue')
@@ -102,16 +107,40 @@ for hrs, series in pv_by_year.items():
 
     # Calculate absolute difference
     error = abs(series.values - aligned_ref.values)
+    mae = np.mean(error)
     plt.fill_between(series.index, series.values, aligned_ref.values, color='blue', alpha=0.3, label='Error vs ref')
-
-    plt.title(f"PV Capacity: {hrs//24//30} vs 183 Days per Year. % Error: {percent_error:.2f}%")
+    # plt.title(f"PV Capacity: {hrs//24//30} vs 183 Days per Year. % Error: {percent_error:.2f}%")
     plt.xlabel("Year")
     plt.ylabel("Installed PV Capacity (GWp)")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(f"/Users/laorie4253/Desktop/pv_annual_installed_{hrs//24//30}.png")
     plt.show()
+    
+for hrs, series in wind_by_year.items():    
+    
+    sample_total = series.sum()
+    percent_error = abs(sample_total - reference_wind_total) / reference_wind_total * 100 # Of total capacity
 
+    plt.figure(figsize=(10, 5))
+    plt.plot(series.index, series.values, label=f'{hrs//24//30} days/year', color='blue')
+    plt.plot(reference_wind.index, reference_wind.values, label='183 days/year (ref)', color='black', linestyle='--')
 
+    # Interpolate reference to match x-axis if needed
+    aligned_ref = reference_wind.reindex(series.index).fillna(method='ffill')
+
+    # Calculate absolute difference
+    error = abs(series.values - aligned_ref.values)
+    mae = np.mean(error)
+    plt.fill_between(series.index, series.values, aligned_ref.values, color='blue', alpha=0.3, label='Deviation vs ref')
+    # plt.title(f"PV Capacity: {hrs//24//30} vs 183 Days per Year. % Error: {percent_error:.2f}%")
+    plt.xlabel("Year")
+    plt.ylabel("Installed Wind Capacity (GWp)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"/Users/laorie4253/Desktop/wind_annual_installed_{hrs//24//30}.png")
+    plt.show()
 
 

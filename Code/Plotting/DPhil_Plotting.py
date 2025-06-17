@@ -561,4 +561,4 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
 
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}.png"))
-    plt.show()
+    

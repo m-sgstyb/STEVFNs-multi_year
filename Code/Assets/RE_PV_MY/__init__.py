@@ -216,52 +216,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         if isinstance(values, str):
             return np.array([float(x) for x in values.split(",")], dtype=float)
         return np.array(values, dtype=float)  # Ensure it's always a NumPy array
-    
-    # def _get_amortised_discounted_cost(self):
-    #     '''
-    #     Calculates discounted and amortised costs matrix for installed capacity
-    #     '''
-    #     # Hard-coded cost curve (per-unit capital cost in each year)
-    #     cost_array = np.array([
-    #         0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
-    #         0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
-    #         0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
-    #         0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
-    #         0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
-    #         0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
-    #     ])
-        
-    #     num_years = self.num_years
-    #     asset_lifetime = 20  # years
-    #     interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
-    #     discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
-    
-    #     # Amortization factor (same for all years, applied to cost per unit)
-    #     r = interest_rate
-    #     n = asset_lifetime
-    #     amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
-    
-    #     # Apply amortization formula to each year's cost
-    #     self.amortised_cost = cost_array[:num_years] * amort_factor  # shape (num_years,)
-    
-    #     # Create index matrices (i: payment year, j: install year)
-    #     i, j = np.meshgrid(np.arange(num_years), np.arange(num_years), indexing='ij')
-    
-    #     # Discount factor to present value from payment year i to install year j
-    #     discount_factor = (1 + discount_rate) ** (i - j)
-    
-    #     # Valid payments only where payment happens within asset lifetime
-    #     valid_mask = (i >= j) & (i < j + asset_lifetime)
-    
-    #     # Reshape amortised_cost and flows for broadcasting
-    #     amortised_j = cp.reshape(self.amortised_cost, (1, num_years))
-    #     flows_j = cp.reshape(self.flows, (1, num_years))
-    
-    #     # Calculate payments matrix
-    #     raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
-    #     self.payments_M = cp.multiply(raw_payments, valid_mask)
-        
-    #     return cp.sum(self.payments_M)
+
     
     def _get_amortised_discounted_cost(self):
         '''
@@ -300,17 +255,9 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
     
         raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
         self.payments_M = cp.multiply(raw_payments, valid_mask)
+        self.yearly_payments = cp.sum(self.payments_M, axis=1)
     
-        # --- NEW: Time scaling to represent full project horizon ---
-        # Total real hours over the project
-        # total_hours = project_years * 365 * 24
-    
-        # # Sampled hours in the optimization
-        # sampled_hours = self.number_of_edges  # Initiated timesteps modelled in asset structure
-    
-        # time_scaling_factor = total_hours / sampled_hours
-    
-        return cp.sum(self.payments_M) #* time_scaling_factor
+        return cp.sum(self.payments_M)
 
     
     def _update_parameters(self):

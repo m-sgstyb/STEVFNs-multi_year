@@ -174,4 +174,4 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
         year_indices = list(self.year_change_indices) + [len(flows_full)]
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
         
-        return yearly_flows
+        return yearly_flows[:30]

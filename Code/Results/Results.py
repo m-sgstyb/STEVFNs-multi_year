@@ -61,7 +61,7 @@ def export_scenario_results(my_network, scenario_name):
             if payments_M is not None:
                 payments = getattr(payments_M, "value", payments_M)
                 if payments is not None:
-                    annual_payments = np.sum(payments, axis=1).tolist()
+                    annual_payments = np.sum(payments, axis=1)
                 else:
                     annual_payments = [0] * num_years
             else:
@@ -70,6 +70,9 @@ def export_scenario_results(my_network, scenario_name):
             data[f"{name}_new_annual_installed_GWp"] = flows.tolist()
             data[f"{name}_total_capacity_GWp"] = (cumulative_installed + existing_capacity_val).tolist()
             data[f"{name}_annual_payments_BUSD"] = annual_payments
+            
+            annual_gen = np.sum(asset.get_yearly_flows(), axis=1)
+            data[f"{name}_annual_generation_GWh"] = annual_gen
             
     # for key, val in data.items():
     #     if hasattr(val, '__len__'):
@@ -630,4 +633,84 @@ def save_yearly_flows_to_csv(network, output_path):
     df = pd.DataFrame(flow_data)
     df.to_csv(output_path, index=False)
     print(f"[✓] Yearly flows saved to {output_path}")
+    
+def get_lcoe_per_year(network, output_path=None):
+    """
+    Saves the annual LCOE with amortised and discounted costs and energy for each year
+    """
+    discount_rate = float(network.system_parameters_df.loc["discount_rate", "value"])
+    num_years = network.assets[0].num_years
+
+    total_gen_energy = np.zeros(num_years)
+    total_discounted_energy = np.zeros(num_years)
+    total_discounted_cost = np.zeros(num_years)
+    demand = None
+
+    for asset in network.assets:
+        try:
+            # Determine cost and flow
+            if hasattr(asset, "get_yearly_usage_costs"):
+                cost = asset.get_yearly_usage_costs()
+            elif asset.asset_name != "EL_Demand_MY":
+                cost = asset.yearly_payments.value
+
+            if asset.asset_name != "EL_Demand_MY":
+                generation_per_year = np.sum(asset.get_yearly_flows(), axis=1)
+            else:
+                demand = np.sum(asset.get_yearly_flows(), axis=1)
+                
+            total_gen_energy += generation_per_year
+            
+            # Apply discounting
+            years = np.arange(num_years)
+            discount_factors = 1 / ((1 + discount_rate) ** years)
+            total_discounted_energy = total_gen_energy * discount_factors
+
+            # Accumulate
+            total_discounted_cost += cost
+
+        except Exception as e:
+            print(f"[Skip] {asset.asset_name}: {e}")
+            continue
+
+    # Final LCOE per year
+    lcoe_per_year = total_discounted_cost / total_discounted_energy
+    lcoe_per_year[np.isnan(lcoe_per_year)] = 0  # handle divide-by-zero safely
+
+    # Optionally save or return
+    if output_path:    
+        np.savetxt(output_path, lcoe_per_year, delimiter=",")
+    return lcoe_per_year
+
+def get_grid_intensity(network, output_path=None):
+    """
+    Saves the annual grid intensity
+    """
+    num_years = network.assets[0].num_years
+
+    total_gen_energy = np.zeros(num_years)
+    emissions_per_year = np.zeros(num_years)
+    for asset in network.assets:
+        try:
+            if asset.asset_name != "EL_Demand_MY":
+                generation_per_year = np.sum(asset.get_yearly_flows(), axis=1)
+            if asset.asset_name == "PP_CO2_MY":
+                emissions_per_year = asset.get_yearly_emissions()
+                
+            total_gen_energy += generation_per_year
+            grid_intensity_per_year = emissions_per_year / total_gen_energy
+        except Exception as e:
+            print(f"[Skip] {asset.asset_name}: {e}")
+            continue
+
+
+    # Optionally save or return
+    if output_path:    
+        np.savetxt(output_path, grid_intensity_per_year, delimiter=",")
+    return grid_intensity_per_year
+    
+
+            
+    
+
     
