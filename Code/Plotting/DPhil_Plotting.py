@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from collections import defaultdict
 import os
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
@@ -471,6 +472,147 @@ def plot_yearly_flows_stacked(network, output_folder):
 
     
     print(f"[✓] Stacked plots saved to: {output_folder}")
+
+def plot_yearly_flows_stacked_by_location(network, case_study_name, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
+
+    tech_order = ["pp", "wind", "pv"]
+    tech_colors = {"pp": "#1f77b4", "wind": "#2ca02c", "pv": "#ff7f0e"}
+    demand_color = "red"
+
+    
+    if case_study_name.endswith("_Collab"):
+        tech_order = ["pp", "transport", "wind", "pv"]
+        tech_colors["transport"] = "#9467bd"  # purple
+
+    # Store flows and demand by location
+    flows_by_loc = defaultdict(lambda: defaultdict(list))
+    demand_by_loc = defaultdict(list)
+
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flows"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception:
+            continue
+
+        name = asset.asset_name.lower()
+
+        # Handle EL_Transport separately
+        if case_study_name.endswith("_Collab") and "el_transport" in name:
+            df = yearly_chunks
+            # target_loc = asset.source_node_location #EL_Transport is defined only from one loc to another and internally builds reverse flows
+
+            for col in df.columns:
+                try:
+                    real_year = int(col.split("_year_")[1])  # e.g., 10, 11, ...
+                except Exception:
+                    continue
+        
+                # Determine direction to choose target node
+                direction = col.split("_year_")[0]  # e.g., "3-0" or "0-3"
+                try:
+                    source_id, target_id = map(int, direction.split("-"))
+                except Exception as e:
+                    print("was not able to get source_id or target_id. Exception:", e)
+                    continue
+        
+                # This direction ends at `target_id`, so we use it as the plot location
+                loc = target_id
+                flow = df[col]
+        
+                while len(flows_by_loc[loc]["transport"]) <= real_year:
+                    flows_by_loc[loc]["transport"].append(np.zeros_like(flow))
+        
+                flows_by_loc[loc]["transport"][real_year] += np.nan_to_num(flow)
+        
+                continue
+        
+        # Identify location
+        if hasattr(asset, "target_node_location"):
+            loc = asset.target_node_location
+        elif hasattr(asset, "node_location"):
+            loc = asset.node_location
+        else:
+            continue  # Skip asset without known location
+
+        if "demand" in name:
+            demand_by_loc[loc] = yearly_chunks
+        else:
+            for tech in tech_order:
+                if tech in name:
+                    tech = tech.lower()
+                    flows_by_loc[loc][tech].append(yearly_chunks)
+                    break
+
+    # Plot per location
+    for loc in demand_by_loc:
+        tech_flows = flows_by_loc[loc]
+        demand_by_year = demand_by_loc[loc]
+        num_years = len(demand_by_year)
+
+        for year in range(num_years):
+            demand = np.array(demand_by_year[year])
+            x = np.arange(len(demand))
+            remaining_demand = demand.copy()
+            bottom = np.zeros_like(demand)
+
+            plt.figure(figsize=(14, 6))
+
+            for tech in tech_order:
+                tech_total = np.zeros_like(demand)
+
+                flows_list = tech_flows.get(tech, [])
+
+                if tech == "transport":
+                    # Only add if transport exists and year index is valid
+                    if year < len(flows_list):
+                        transport_flow = flows_list[year]
+                        if len(transport_flow) == len(demand):
+                            tech_total += np.nan_to_num(transport_flow)
+                        else:
+                            print(f"⚠️ Transport flow shape mismatch in year {year} at loc {loc}")
+                else:
+                    for flows in flows_list:
+                        if year < len(flows):
+                            flow_year = np.array(flows[year])
+                            if flow_year.shape != demand.shape:
+                                print(f"⚠️ Flow shape mismatch in year {year} for tech {tech} at loc {loc}: "
+                                      f"expected {demand.shape}, got {flow_year.shape}")
+                            tech_total += flow_year
+
+                used = np.minimum(tech_total, remaining_demand)
+                excess = tech_total - used
+
+                plt.fill_between(x, bottom, bottom + used,
+                                 color=tech_colors[tech],
+                                 label=tech.capitalize(),
+                                 alpha=1.0,
+                                 edgecolor='none')
+
+                plt.fill_between(x, bottom + used, bottom + used + excess,
+                                 color=tech_colors[tech],
+                                 alpha=0.3,
+                                 edgecolor=tech_colors[tech])
+
+                bottom += tech_total
+                remaining_demand -= used
+                remaining_demand = np.clip(remaining_demand, 0, None)
+
+            plt.plot(x, demand, color=demand_color, label="Demand",
+                     linestyle="--", linewidth=1.5)
+
+            plt.title(f"Location {loc} – Stacked Generation vs Demand – Year {year}")
+            plt.xlabel("Hour")
+            plt.ylabel("Power Flow")
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_folder, f"stacked_loc_{loc}_year_{year}.png"))
+            plt.close()
+
+        print(f"[✓] Plots for location {loc} saved to: {output_folder}")
     
 def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
     """

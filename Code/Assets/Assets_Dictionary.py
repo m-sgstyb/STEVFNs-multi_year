@@ -18,6 +18,7 @@ from .NH3_to_EL import NH3_to_EL_Asset
 from .NH3_Storage import NH3_Storage_Asset
 from .NH3_to_HTH import NH3_to_HTH_Asset
 from .EL_Transport import EL_Transport_Asset
+from .EL_Transport_MY import EL_Transport_MY_Asset
 from .NH3_Transport import NH3_Transport_Asset
 from .RE_PV import RE_PV_Asset
 from .RE_WIND import RE_WIND_Asset
@@ -50,6 +51,7 @@ ASSET_DICT = {EL_Demand_Asset.asset_name: EL_Demand_Asset,
               NH3_Storage_Asset.asset_name: NH3_Storage_Asset,
               NH3_to_HTH_Asset.asset_name: NH3_to_HTH_Asset,
               EL_Transport_Asset.asset_name: EL_Transport_Asset,
+              EL_Transport_MY_Asset.asset_name: EL_Transport_MY_Asset,
               NH3_Transport_Asset.asset_name: NH3_Transport_Asset,
               RE_PV_Asset.asset_name: RE_PV_Asset,
               RE_WIND_Asset.asset_name: RE_WIND_Asset,

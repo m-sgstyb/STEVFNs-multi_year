@@ -19,17 +19,17 @@ from Code.Results import Results
 
 #### Define Input Files ####
 # sample_sizes = [51840, 69120, 131760]
-# sample_sizes = [4320, 8640, 17280, 34560]
+#sample_sizes = [4320, 8640, 17280, 69120]
 # sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
-sample_sizes = [17280]
+sample_sizes = [4320]
 
 # case_study_name = "MEX_30y_MY_17280"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
-
+case_study_name = "MEX-CHL_Collab"
 
 for sample in sample_sizes:
     
-    case_study_name = f"MEX_30y_MY_{sample}"
+    # case_study_name = f"MEX_30y_MY_{sample}"
     
     
     base_folder = os.path.dirname(__file__)
@@ -134,9 +134,11 @@ for sample in sample_sizes:
               
             yearly_path = os.path.join(case_study_folder, f"all_flows_yearly_{scenario_name}.csv")
             Results.save_yearly_flows_to_csv(my_network, yearly_path)
-            
-            DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
-            DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
+            if case_study_name.endswith("_Collab") or case_study_name.endswith("_Autarky"):
+                DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name, results_folder)
+            else:
+                DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
+                DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
         
         # DPhil_Plotting.get_install_pathways(my_network.assets[1], results_folder, tech_name="PV")
         # DPhil_Plotting.get_install_pathways(my_network.assets[2], results_folder, tech_name="Wind")

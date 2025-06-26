@@ -141,7 +141,11 @@ class Network_STEVFNs:
         self.system_structure_df = network_structure_df[["Asset_Number", "Asset_Class", "Location_1", "Location_2"]]
         #Generate Assets#
         for counter1 in range(len(network_structure_df)):
-            self.generate_asset(network_structure_df.iloc[counter1])
+            try:
+                self.generate_asset(network_structure_df.iloc[counter1])
+            except Exception as e:
+                print(f"[Skip] Asset {counter1}: {e}")
+                continue
         #Add properties, costs, constraints, objective and build problem#
         self.build_problem()
         return

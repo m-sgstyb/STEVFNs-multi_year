@@ -621,13 +621,13 @@ def save_yearly_flows_to_csv(network, output_path):
             flow_data[col_name] = np.array(flow_array).flatten()
 
     # Determine max column length for padding
-    max_len = max(len(arr) for arr in flow_data.values())
+    # max_len = max(len(arr) for arr in flow_data.values())
 
     # Pad all arrays with np.nan to equal length
-    for key in flow_data:
-        padded = np.full(max_len, np.nan)
-        padded[:len(flow_data[key])] = flow_data[key]
-        flow_data[key] = padded
+    # for key in flow_data:
+    #     padded = np.full(max_len, np.nan)
+    #     padded[:len(flow_data[key])] = flow_data[key]
+    #     flow_data[key] = padded
 
     # Create DataFrame and save
     df = pd.DataFrame(flow_data)
@@ -651,11 +651,14 @@ def get_lcoe_per_year(network, output_path=None):
             # Determine cost and flow
             if hasattr(asset, "get_yearly_usage_costs"):
                 cost = asset.get_yearly_usage_costs()
+                print(f"{asset.asset_name} length yearly usage costs length:", len(cost))
             elif asset.asset_name != "EL_Demand_MY":
                 cost = asset.yearly_payments.value
+                print(f"{asset.asset_name} length yearly payments amort length:", len(cost))
 
             if asset.asset_name != "EL_Demand_MY":
                 generation_per_year = np.sum(asset.get_yearly_flows(), axis=1)
+                print(f"{asset.asset_name} gen per year length:", len(generation_per_year))
             else:
                 demand = np.sum(asset.get_yearly_flows(), axis=1)
                 
