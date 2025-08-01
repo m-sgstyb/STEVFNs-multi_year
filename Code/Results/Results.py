@@ -21,37 +21,59 @@ import numpy as np
 
 
 def export_scenario_results(my_network, scenario_name):
+    print("========= Exporting summary scenario results ========")
     num_years = my_network.assets[0].num_years
     years = list(range(1, num_years + 1))
-    # print(len(years), len([0] * num_years))
+    print(f"Expected number of years: {num_years}")
+    discount_rate = float(my_network.system_parameters_df.loc["discount_rate", "value"])
+    discount_factors = 1 / ((1 + discount_rate) ** np.arange(num_years))
     # Initialize base dictionary
-    data = {
-        "year": years,
-        "scenario": [scenario_name] * num_years,
-        "Annual_Emissions": [0] * num_years,
-        "Peak_Annual_Demand": [0] * num_years,
-        "Total_Annual_Demand": [0] * num_years,
-        "Peak_Annual_Fossil_Gen_GWp": [0] * num_years,
-        "Total_Annual_Fossil_Gen_GWh": [0] * num_years,
-        "Annual_NPV_OPEX_PP_BUSD": [0] * num_years,
-    }
+    data = {}
+
+    def safe_assign(key, value):
+        try:
+            if hasattr(value, '__len__') and not isinstance(value, str):
+                val_len = len(value)
+                print(f"Assigning '{key}' with length {val_len}")
+                if val_len != num_years:
+                    print(f"  ❗ Length mismatch for '{key}': got {val_len}, expected {num_years}")
+            else:
+                print(f"Assigning '{key}' (non-list-like or scalar)")
+            data[key] = value
+        except Exception as e:
+            print(f"❌ Error assigning '{key}': {e}")
+            raise
+
+    safe_assign("year", years)
+    safe_assign("scenario", [scenario_name] * num_years)
+    safe_assign("Annual_Emissions", [0] * num_years)
+    safe_assign("Peak_Annual_Demand", [0] * num_years)
+    safe_assign("Total_Annual_Demand", [0] * num_years)
+    safe_assign("Discounted_Annual_Demand", [0] * num_years)
+    safe_assign("Peak_Annual_Fossil_Gen_GWp", [0] * num_years)
+    safe_assign("Total_Annual_Fossil_Gen_GWh", [0] * num_years)
+    safe_assign("Discounted_Annual_Fossil_Gen_GWh", [0] * num_years)
+    safe_assign("Annual_NPV_OPEX_PP_BUSD", [0] * num_years)
 
     for asset in my_network.assets[1:]:
         name = asset.asset_name
+        print(f"\nProcessing asset: {name}")
 
-        # Demand asset
         if hasattr(asset, "peak_demand"):
-            data["Peak_Annual_Demand"] = asset.peak_demand()
-            data["Total_Annual_Demand"] = asset.asset_size()
-                  
-        # Fossil plant with emissions
-        if hasattr(asset, "get_yearly_emissions"):
-            data["Annual_Emissions"] = asset.get_yearly_emissions()
-            data["Peak_Annual_Fossil_Gen_GWp"] = asset.peak_generation()
-            data["Total_Annual_Fossil_Gen_GWh"] = [sum(year) for year in asset.get_yearly_flows()[:num_years]]
-            data["Annual_NPV_OPEX_PP_BUSD"] = asset.get_yearly_usage_costs()
+            safe_assign("Peak_Annual_Demand", asset.peak_demand())
+            safe_assign("Total_Annual_Demand", asset.asset_size())
+            safe_assign("Discounted_Annual_Demand", asset.asset_size() * discount_factors)
 
-        # Renewable asset
+        if hasattr(asset, "get_yearly_emissions"):
+            safe_assign("Annual_Emissions", asset.get_yearly_emissions())
+            safe_assign("Peak_Annual_Fossil_Gen_GWp", asset.peak_generation())
+            flows = asset.get_yearly_flows()[:num_years]
+            summed_flows = [sum(year) for year in flows]
+            safe_assign("Total_Annual_Fossil_Gen_GWh", summed_flows)
+            discounted_flows = summed_flows * discount_factors
+            safe_assign("Discounted_Annual_Fossil_Gen_GWh", discounted_flows.tolist())
+            safe_assign("Annual_NPV_OPEX_PP_BUSD", asset.get_yearly_usage_costs())
+
         if hasattr(asset, "cumulative_new_installed"):
             flows = getattr(asset.flows, "value", asset.flows)
             cumulative_installed = asset.cumulative_new_installed.value
@@ -60,25 +82,18 @@ def export_scenario_results(my_network, scenario_name):
             payments_M = getattr(asset, "payments_M", None)
             if payments_M is not None:
                 payments = getattr(payments_M, "value", payments_M)
-                if payments is not None:
-                    annual_payments = np.sum(payments, axis=1)
-                else:
-                    annual_payments = [0] * num_years
+                annual_payments = np.sum(payments, axis=1) if payments is not None else [0] * num_years
             else:
                 annual_payments = [0] * num_years
 
-            data[f"{name}_new_annual_installed_GWp"] = flows.tolist()
-            data[f"{name}_total_capacity_GWp"] = (cumulative_installed + existing_capacity_val).tolist()
-            data[f"{name}_annual_payments_BUSD"] = annual_payments
-            
+            safe_assign(f"{name}_new_annual_installed_GWp", flows.tolist())
+            safe_assign(f"{name}_total_capacity_GWp", (cumulative_installed + existing_capacity_val).tolist())
+            safe_assign(f"{name}_annual_payments_BUSD", annual_payments)
             annual_gen = np.sum(asset.get_yearly_flows(), axis=1)
-            data[f"{name}_annual_generation_GWh"] = annual_gen
-            
-    # for key, val in data.items():
-    #     if hasattr(val, '__len__'):
-    #         print(f"{key}: length {len(val)}")
-    #     else:
-    #         print(f"{key}: scalar value")
+            safe_assign(f"{name}_annual_generation_GWh", annual_gen)
+            safe_assign(f"{name}_discounted_annual_gen_GWh", annual_gen * discount_factors)
+
+    print("\n✅ All data lengths checked. Creating DataFrame...")
     time_series_df = pd.DataFrame(data)
 
     # Cost summary
@@ -96,6 +111,7 @@ def export_scenario_results(my_network, scenario_name):
     summary_df = pd.DataFrame(cost_summary)
 
     return time_series_df, summary_df
+
 
 
 
@@ -621,69 +637,105 @@ def save_yearly_flows_to_csv(network, output_path):
             flow_data[col_name] = np.array(flow_array).flatten()
 
     # Determine max column length for padding
-    # max_len = max(len(arr) for arr in flow_data.values())
+    max_len = max(len(arr) for arr in flow_data.values())
 
     # Pad all arrays with np.nan to equal length
-    # for key in flow_data:
-    #     padded = np.full(max_len, np.nan)
-    #     padded[:len(flow_data[key])] = flow_data[key]
-    #     flow_data[key] = padded
+    for key in flow_data:
+        padded = np.full(max_len, np.nan)
+        padded[:len(flow_data[key])] = flow_data[key]
+        flow_data[key] = padded
 
     # Create DataFrame and save
     df = pd.DataFrame(flow_data)
     df.to_csv(output_path, index=False)
     print(f"[✓] Yearly flows saved to {output_path}")
-    
+
+
 def get_lcoe_per_year(network, output_path=None):
     """
-    Saves the annual LCOE with amortised and discounted costs and energy for each year
+    Returns a DataFrame with annual total discounted energy, cost, and LCOE (USD/MWh).
+    Optionally saves this data as CSV.
     """
+    print("======== Saving LCOE per year calculation =========")
+    
     discount_rate = float(network.system_parameters_df.loc["discount_rate", "value"])
     num_years = network.assets[0].num_years
 
     total_gen_energy = np.zeros(num_years)
-    total_discounted_energy = np.zeros(num_years)
+    total_discounted_energy = np.zeros(num_years) # total generated energy
+    total_discounted_demand = np.zeros(num_years) # total utilised energy
     total_discounted_cost = np.zeros(num_years)
-    demand = None
+
+    years = np.arange(num_years)
+    discount_factors = 1 / ((1 + discount_rate) ** years)
 
     for asset in network.assets:
         try:
-            # Determine cost and flow
+            # Determine cost and apply discounting
             if hasattr(asset, "get_yearly_usage_costs"):
                 cost = asset.get_yearly_usage_costs()
-                print(f"{asset.asset_name} length yearly usage costs length:", len(cost))
             elif asset.asset_name != "EL_Demand_MY":
                 cost = asset.yearly_payments.value
-                print(f"{asset.asset_name} length yearly payments amort length:", len(cost))
+            else:
+                cost = None
+
+            if cost is not None:
+                total_discounted_cost += cost
 
             if asset.asset_name != "EL_Demand_MY":
                 generation_per_year = np.sum(asset.get_yearly_flows(), axis=1)
-                print(f"{asset.asset_name} gen per year length:", len(generation_per_year))
-            else:
-                demand = np.sum(asset.get_yearly_flows(), axis=1)
-                
-            total_gen_energy += generation_per_year
-            
-            # Apply discounting
-            years = np.arange(num_years)
-            discount_factors = 1 / ((1 + discount_rate) ** years)
-            total_discounted_energy = total_gen_energy * discount_factors
+                # sampled_days = int((asset.number_of_edges / 24) / asset.num_years)
+                # simulation_factor = 365 / sampled_days
+                # generation_per_year *= simulation_factor
 
-            # Accumulate
-            total_discounted_cost += cost
+                discounted_generation = generation_per_year * discount_factors
+                total_discounted_energy += discounted_generation
+
+                total_gen_energy += generation_per_year
+            else:
+                demand_per_year = np.sum(asset.get_yearly_flows(), axis=1)
+                sampled_days = int((asset.number_of_edges / 24) / asset.num_years)
+                simulation_factor = 365 / sampled_days
+                demand_per_year *= simulation_factor
+                
+                discounted_demand = demand_per_year * discount_factors
+                total_discounted_demand += discounted_demand
 
         except Exception as e:
             print(f"[Skip] {asset.asset_name}: {e}")
             continue
 
-    # Final LCOE per year
-    lcoe_per_year = total_discounted_cost / total_discounted_energy
-    lcoe_per_year[np.isnan(lcoe_per_year)] = 0  # handle divide-by-zero safely
+    # Compute LCOE (in USD/MWh)
+    lcoe_per_year = np.divide(
+        total_discounted_cost,
+        total_discounted_energy,
+        out=np.zeros_like(total_discounted_cost),
+        where=total_discounted_energy != 0,
+    ) * 1e3  # BUSD/GWh → USD/kWh
+    
+    # Compute LCUE (in USD/MWh)
+    lcue_per_year = np.divide(
+        total_discounted_cost,
+        total_discounted_demand,
+        out=np.zeros_like(total_discounted_cost),
+        where=total_discounted_demand != 0,
+    ) * 1e3  # BUSD/GWh → USD/kWh
 
-    # Optionally save or return
-    if output_path:    
-        np.savetxt(output_path, lcoe_per_year, delimiter=",")
-    return lcoe_per_year
+    # Create DataFrame
+    df = pd.DataFrame({
+        "total_discounted_energy_GWh": total_discounted_energy,
+        "total_discounted_cost_BUSD": total_discounted_cost,
+        "total_discounted_demand_GWh": total_discounted_demand,
+        "lcoe_USD/kWh": lcoe_per_year,
+        "lcue_USD/kWh": lcue_per_year
+    })
+
+    # Save if needed
+    if output_path:
+        df.to_csv(output_path, index=False)
+
+    return df
+
 
 def get_grid_intensity(network, output_path=None):
     """
@@ -701,7 +753,7 @@ def get_grid_intensity(network, output_path=None):
                 emissions_per_year = asset.get_yearly_emissions()
                 
             total_gen_energy += generation_per_year
-            grid_intensity_per_year = emissions_per_year / total_gen_energy
+            grid_intensity_per_year = emissions_per_year / total_gen_energy #MtCO2/GWh
         except Exception as e:
             print(f"[Skip] {asset.asset_name}: {e}")
             continue

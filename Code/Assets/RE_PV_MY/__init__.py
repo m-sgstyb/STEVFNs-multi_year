@@ -116,28 +116,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
             * self.gen_profile[edge_number]
         return
     
-    def build_edge_2(self):
-        ''' Build a second edge to constrain maximum capacity'''
-        source_node_type = "NULL"
-        source_node_location = self.source_node_location_2
-        source_node_time = 0
-        target_node_type = self.target_node_type_2
-        target_node_location = self.target_node_location_2
-        target_node_time = self.target_node_time_2
-       
-        new_edge = Edge_STEVFNs()
-        self.edges += [new_edge]
-        if source_node_type != "NULL":
-            new_edge.attach_source_node(self.network.extract_node(
-                source_node_location, source_node_type, source_node_time))
-        if target_node_type != "NULL":
-            new_edge.attach_target_node(self.network.extract_node(
-                target_node_location, target_node_type, target_node_time))
-        new_edge.flow = self.flows # capacities, CVXPY variable
-        new_edge.conversion_fun = self.conversion_fun_2
-        new_edge.conversion_fun_params = self.conversion_fun_params_2
-        return
-    
     def build_max_capacity_edges(self, year_number):
         '''
         Builds edges per year to constrain maximum capacity to be installed per year
@@ -145,7 +123,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         '''
         source_node_type = self.source_node_type_2
         source_node_location = self.source_node_location_2
-        target_node_type = self.target_node_location_2
+        target_node_type = self.target_node_type_2
         target_node_location = source_node_location
         
         source_node_time = 0
@@ -247,7 +225,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
     
         # Create index matrices for payment timing
         i, j = np.meshgrid(np.arange(project_years), np.arange(project_years), indexing='ij')
-        discount_factor = (1 + discount_rate) ** (i - j)
+        # discount_factor = (1 + discount_rate) ** (i - j) # This was discounting to year j, not year 0
+        discount_factor = (1 + discount_rate) ** i # This discounts to year 0
         valid_mask = (i >= j) & (i < j + asset_lifetime)
     
         amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)
@@ -367,6 +346,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         """
         Returns a list of flow slices split by each year using year_change_indices.
         """
+        sampled_days = int((self.number_of_edges / 24) / self.num_years) # sampled days per year in horizon
+        simulation_factor = 365 / sampled_days
         # Ensure indices are available
         if not hasattr(self, "year_change_indices"):
             if hasattr(self, "_get_year_change_indices"):
@@ -386,5 +367,5 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # Final slicing using year_change_indices
         year_indices = list(self.year_change_indices) + [len(flows_full)]
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        
+        yearly_flows = [flow * simulation_factor for flow in yearly_flows]
         return yearly_flows

@@ -23,9 +23,9 @@ from Code.Results import Results
 # sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
 sample_sizes = [4320]
 
-# case_study_name = "MEX_30y_MY_17280"
+case_study_name = "MEX_30y_MY_69120"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
-case_study_name = "MEX-CHL_Collab"
+# case_study_name = "MEX-CHL_Collab"
 
 for sample in sample_sizes:
     
@@ -122,13 +122,11 @@ for sample in sample_sizes:
         print("Total cost to satisfy all demand = ", my_network.problem.value, " Billion USD")
         for asset in my_network.assets:
             if asset.asset_name == "CO2_Budget_MY":
-                print("Total emissions = ", [float(f"{i:.3g}") for i in asset.asset_size()], "MtCO2e")
-                
+                print("Total emissions = ", [float(f"{i:.3g}") for i in asset.asset_size()], "MtCO2e")    
+        
         emissions_reduction = my_network.assets[0].asset_size()
         scenario_name = my_network.scenario_name
         emissions_dict[scenario_name] = emissions_reduction
-        
-        
     
         if my_network.problem.value != float("inf"):
               
@@ -144,14 +142,14 @@ for sample in sample_sizes:
         # DPhil_Plotting.get_install_pathways(my_network.assets[2], results_folder, tech_name="Wind")
         DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
         
+        time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
+        time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+        summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
+        
         save_path_lcoe = os.path.join(results_folder, "lcoe_per_year.csv")
         save_path_gef = os.path.join(results_folder, "gef_per_year.csv")
         lcoe = Results.get_lcoe_per_year(my_network, save_path_lcoe)
         grid_emissions_factor = Results.get_grid_intensity(my_network, save_path_gef)
-        
-        time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
-        time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
-        summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
     
         emissions_df = pd.DataFrame(emissions_dict)
         # Save to CSV

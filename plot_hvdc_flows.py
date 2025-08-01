@@ -94,12 +94,13 @@ def plot_hourly_flows_from_csv(csv_path, period=1):
     ax.set_xticks(year_ticks)
     ax.set_xticklabels(year_labels)
 
-    ax.set_ylabel("Flow (MW) – Absolute")
+    ax.set_ylabel("Flow (GW)")
     ax.set_xlabel("Time (hours)")
-    ax.set_title("Hourly HVDC Flows (Positive = 0→2, Negative = 2→0)")
+    ax.set_title("Hourly HVDC Flows (Positive = Mexico→Chile, Negative = Chile→Mexico)")
     ax.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig("hourly_flows_MEX-CHL_Collab.png", dpi=300)
     plt.show()
 
     # Plot 2: Both series positive, separate colors
@@ -116,6 +117,7 @@ def plot_hourly_flows_from_csv(csv_path, period=1):
     ax.legend()
     plt.grid(True)
     plt.tight_layout()
+    # plt.savefig("hourly_flows_MEX-CHL_Collab.png", dpi=300)
     plt.show()
 
     

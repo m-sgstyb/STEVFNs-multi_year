@@ -85,30 +85,6 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
 
         self.flows.value = new_profile[:self.number_of_edges]
         return
-
-    # def _get_year_change_indices(self):
-    #     timesteps = self.number_of_edges
-    #     num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
-    #     total_length = 8760 * num_years
-
-    #     set_size = self.parameters_df["set_size"]
-    #     set_number = self.parameters_df["set_number"]
-    #     n_sets = int(np.ceil(timesteps / set_size))
-    #     gap = int(total_length / (n_sets * set_size)) * set_size
-    #     offset = set_size * set_number
-
-    #     self.year_change_indices = []
-    #     last_year = -1
-
-    #     for counter1 in range(n_sets):
-    #         old_loc_0 = offset + gap * counter1
-    #         new_loc_0 = set_size * counter1
-    #         current_year = old_loc_0 // 8760
-    #         if current_year != last_year:
-    #             self.year_change_indices.append(new_loc_0)
-    #             last_year = current_year
-
-    #     return self.year_change_indices
     
     def _get_year_change_indices(self):
         hours_per_day = 24
@@ -154,6 +130,7 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
         """
         Returns a list of flow slices split by each year using year_change_indices.
         """
+        
         # Ensure indices are available
         if not hasattr(self, "year_change_indices"):
             if hasattr(self, "_get_year_change_indices"):
@@ -171,7 +148,7 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
             flows_full = np.array(flows_full)
     
         # Final slicing using year_change_indices
-        year_indices = list(self.year_change_indices) + [len(flows_full)]
+        year_indices = self.year_change_indices
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
         
         return yearly_flows

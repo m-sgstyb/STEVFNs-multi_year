@@ -206,10 +206,9 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         total_hourly_costs = hourly_costs * hourly_flows  # element-wise cost per hour
     
         # Final slicing using year_change_indices
-        year_indices = list(self.year_change_indices) # This leaves things weird for results, need to check this method
-        # year_indices = self._get_year_change_indices()
-        # year_indices.append(len(self.flows.value))
-    
+        year_indices = self.year_change_indices.copy()
+        # year_indices = self.year_change_indices + [self.number_of_edges] # for gef and lcoe methods but not for export_scenario_results
+        print(year_indices)
         yearly_costs = [
             np.sum(total_hourly_costs[start:end])
             for start, end in zip(year_indices[:-1], year_indices[1:])
@@ -267,6 +266,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         """
         Returns a list of flow slices split by each year using year_change_indices.
         """
+        sampled_days = int((self.number_of_edges / 24) / self.num_years) # sampled days per year in horizon
+        simulation_factor = 365 / sampled_days
         # Ensure indices are available
         if not hasattr(self, "year_change_indices"):
             if hasattr(self, "_get_year_change_indices"):
@@ -284,8 +285,9 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
             flows_full = np.array(flows_full)
     
         # Final slicing using year_change_indices
-        year_indices = list(self.year_change_indices) + [len(flows_full)]
+        year_indices = self.year_change_indices
+        # year_indices = self.year_change_indices + [self.number_of_edges] # gets correct length for lcoe calculation
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        
+        yearly_flows = [flow * simulation_factor for flow in yearly_flows]
         return yearly_flows
                 
