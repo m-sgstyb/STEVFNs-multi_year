@@ -23,7 +23,7 @@ from Code.Results import Results
 # sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
 sample_sizes = [4320]
 
-case_study_name = "MEX_30y_MY_69120"
+case_study_name = "MEX_30y_MY_8640"
 # case_study_name = "MEX_30y_MY_no_CO2_budget"
 # case_study_name = "MEX-CHL_Collab"
 

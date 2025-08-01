@@ -33,6 +33,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         '''Conversion function to limit to maximum capacity vector'''
         return params["maximum_size"] - flows
     
+    
     def build_cost(self):
         '''Re-define build_cost method for this asset to get amortised and discounted cost'''
         self.cost = self._get_amortised_discounted_cost()
@@ -51,6 +52,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
                                                                        name=f"tech_potential_{self.asset_name}")}
+        self.conversion_fun_params_4 = {"embedded_emissions_factor": cp.Parameter(nonneg=True,
+                                                                       name=f"embed_emissions_{self.asset_name}")}
         return
     
     def define_structure(self, asset_structure):
@@ -81,15 +84,17 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                                                                 nonneg=True)}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
                                                                        name=f"tech_potential_{self.asset_name}")}
+        self.conversion_fun_params_4 = {"embedded_emissions_factor": cp.Parameter(nonneg=True,
+                                                                       name=f"embed_emissions_{self.asset_name}")}
         self.year_change_indices = self._get_year_change_indices()
         self.asset_lifetime = 20 # hard-coded for testing
         return
     
     def build_edge(self, edge_number):
         target_node_time = self.target_node_times[edge_number]
-        new_edge = Edge_STEVFNs()
-        self.edges += [new_edge]
-        new_edge.attach_target_node(self.network.extract_node(
+        self.flow_edge = Edge_STEVFNs()
+        self.edges += [self.flow_edge]
+        self.flow_edge.attach_target_node(self.network.extract_node(
             self.target_node_location, self.target_node_type, target_node_time))
         
         # Find correct index_number for year to correctly generate power flow
@@ -112,7 +117,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # This multiplies each flow by its active years
         self.cumulative_new_installed = cp.matmul(lifetime_mask, self.flows)
         
-        new_edge.flow = (self.cumulative_new_installed[index_number] + self.conversion_fun_params["existing_capacity"][index_number])\
+        self.flow_edge.flow = (self.cumulative_new_installed[index_number] + self.conversion_fun_params["existing_capacity"][index_number])\
             * self.gen_profile[edge_number]
         return
     
@@ -179,6 +184,29 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         technical_capacity = self.conversion_fun_params_3["tech_potential"]
         edge.flow = technical_capacity - total_available_capacity
     
+    def build_embedded_emissions_edge(self):
+        '''Build edge to calculate embedded emissions over the total generation of the asset'''
+        source_node_type = "NULL"
+        source_node_location = self.source_node_location
+        source_node_time = 0
+        target_node_type = "CO2_Budget"
+        target_node_location = 0
+        target_node_time = 0
+        
+        self.embed_emissions_edge = Edge_STEVFNs()
+        self.edges += [self.embed_emissions_edge]
+        if source_node_type != "NULL":
+            self.embed_emissions_edge.attach_source_node(self.network.extract_node(
+                source_node_location, source_node_type, source_node_time))
+        if target_node_type != "NULL":
+            self.embed_emissions_edge.attach_target_node(self.network.extract_node(
+                target_node_location, target_node_type, target_node_time))
+        power_flows = self.flow_edge.flow
+        self.embed_emissions_edge.flow = cp.sum(power_flows) * -self.conversion_fun_params_4["embedded_emissions_factor"]
+        
+        return
+    
+    
     def build_edges(self):
         self.edges = []
         for hour in range(self.number_of_edges):
@@ -186,6 +214,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         for year in range(self.num_years):
             self.build_max_capacity_edges(year)
             self.build_tech_potential_edges(year)
+        self.build_embedded_emissions_edge()
         return
     
     def process_csv_values(self,values):
@@ -251,6 +280,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         for parameter_name, parameter in self.conversion_fun_params_2.items():
             parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
         for parameter_name, parameter in self.conversion_fun_params_3.items():
+            parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
+        for parameter_name, parameter in self.conversion_fun_params_4.items():
             parameter.value = self.process_csv_values(self.parameters_df[parameter_name])
         self._load_RE_profile()
     
@@ -369,3 +400,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
         yearly_flows = [flow * simulation_factor for flow in yearly_flows]
         return yearly_flows
+    
+    def get_total_embedded_emissions(self):
+        return self.embed_emissions_edge.flow.value
