@@ -20,8 +20,6 @@ from .NH3_to_HTH import NH3_to_HTH_Asset
 from .EL_Transport import EL_Transport_Asset
 from .EL_Transport_MY import EL_Transport_MY_Asset
 from .NH3_Transport import NH3_Transport_Asset
-from .RE_PV import RE_PV_Asset
-from .RE_WIND import RE_WIND_Asset
 from .EL_Demand_UM import EL_Demand_UM_Asset
 from .CO2_Budget import CO2_Budget_Asset
 from .CO2_Budget_MY import CO2_Budget_MY_Asset
@@ -51,8 +49,6 @@ ASSET_DICT = {EL_Demand_Asset.asset_name: EL_Demand_Asset,
               EL_Transport_Asset.asset_name: EL_Transport_Asset,
               EL_Transport_MY_Asset.asset_name: EL_Transport_MY_Asset,
               NH3_Transport_Asset.asset_name: NH3_Transport_Asset,
-              RE_PV_Asset.asset_name: RE_PV_Asset,
-              RE_WIND_Asset.asset_name: RE_WIND_Asset,
               EL_Demand_UM_Asset.asset_name: EL_Demand_UM_Asset,
               CO2_Budget_Asset.asset_name: CO2_Budget_Asset,
               CO2_Budget_MY_Asset.asset_name: CO2_Budget_MY_Asset,
