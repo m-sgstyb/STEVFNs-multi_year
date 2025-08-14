@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+title: STEVFNs-multi_year
+message: >-
+  If you use this adapted version of the STEVFNs framework,
+  please cite both this repository and the original work by
+  Aniq Ahsan.
+type: software
+authors:
+  - given-names: Mónica
+    family-names: Sagastuy-Breña
+    affiliation: University of Oxford
+    orcid: 'https://orcid.org/0000-0003-3671-0103'
+identifiers:
+  - type: url
+    value: 'https://github.com/m-sgstyb/STEVFNs-multi_year'
+repository-code: 'https://github.com/m-sgstyb/STEVFNs-multi_year'
+license: MIT
+version: 1.0.0
+date-released: '2025-10-11'
+
+
+references:
+  - type: software
+    authors:
+      - given-names: Aniq
+        family-names: Ahsan
+
+    title: "STEVFNs Tool"
+    version: "1.0"
+    date-released: '2022-11-01'
+    url: 'https://github.com/OmNomNomzzz/STEVFNs'
+
+  - type: thesis
+    authors:
+      - given-names: Aniq
+        family-names: Ahsan
+    title: "Generalized Spatio-Temporal Model for the Optimal Sizing, Operation, and Location of Energy System Assets"
+    date-released: '2022'
+    institution: University of Oxford
+    url: 'https://ora.ox.ac.uk/objects/uuid:fc64231e-524e-433f-9b32-b9ffe5b5f974'
