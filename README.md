@@ -13,7 +13,7 @@ As an application of the original software, this code is licensed under an MIT l
 > 1. This repository and associated doctoral thesis (when published)
 > 2. The original STEVFNs Tool software and the associated doctoral thesis by Aniq Ahsan
 >
-> The direct GitHub link to "Cite this repository" will only display the APA and BibTex citations for this repository. For the full citations list, please see or download the [citations.bib](/citations.bib) file.
+> The direct GitHub link to "Cite this repository" will only display the APA and BibTex citations for this repository. For the full citations list, please see or download the [citations.bib](/CITATIONS.bib) file.
 
 Please also see the NOTICE file to find the license for dependent software used in this model.
 
