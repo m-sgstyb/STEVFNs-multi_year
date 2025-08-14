@@ -51,7 +51,7 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         decision_time = asset_structure["Start_Time"]
         horizon_end = asset_structure["End_Time"]
         sampled_length = horizon_end - decision_time
-        hours_per_year = sampled_length / self.num_years # Determines the per-year chunks of time sampled
+        hours_per_year = sampled_length / self.num_years # Determines the per-year chunks of time sampled per direction
         # Effective operation delay in hours, scaled to sampling
         delay_years = 10
         delay = delay_years * hours_per_year
@@ -136,32 +136,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             print("tried getting discount vector but:", e)
         
         return annualised_payment * sum(discount_vector)
-
-    # def _get_discounted_usage_cost(self):
-    #     discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
-    #     usage_constant = self.cost_fun_params["usage_constant"].value
-    #     project_years = self.num_years
-
-    #     self._get_year_change_indices()
-    #     self.usage_costs = []
-    #     for y in range(project_years):
-    #         start_idx = self.year_change_indices[y]
-    #         end_idx = self.year_change_indices[y + 1] if y + 1 < len(self.year_change_indices) else self.number_of_edges
-            
-    #         forward_flow = cp.sum(self.flows[start_idx:end_idx])
-    #         reverse_start = self.number_of_edges + start_idx
-    #         reverse_end = self.number_of_edges + end_idx
-    #         reverse_flow = cp.sum(self.flows[reverse_start:reverse_end])
-    #         total_flow = forward_flow + reverse_flow
-
-            
-    #         # total_flow = cp.sum(self.flows[start_idx:end_idx]) + cp.sum(
-    #         #     self.flows[self.number_of_edges + start_idx : self.number_of_edges + end_idx]
-    #         # )
-    #         discounted_cost = (usage_constant * total_flow) / ((1 + discount_rate) ** y)
-    #         self.usage_costs.append(discounted_cost)
-
-    #     return cp.sum(self.usage_costs)
     
     def _get_discounted_usage_cost(self):
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
@@ -199,14 +173,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         R = 6.371 # in Mm radius of the earth
         self.distance = R * c # in Mm
         return 
-
-    # def _get_year_change_indices(self):
-    #     hours_per_day = 24
-    #     num_years = self.num_years
-    #     days_per_year = int((self.number_of_edges / hours_per_day) / num_years)
-    #     hours_per_year = days_per_year * hours_per_day
-    #     self.year_change_indices = [i * hours_per_year for i in range(num_years)]
-    #     return self.year_change_indices
     
     def _get_year_change_indices(self):
         """
@@ -233,8 +199,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             self.year_change_indices.append(idx)
             
         self.year_change_indices.append(total_hours)
-
-
     
     
     def _update_parameters(self):
@@ -249,45 +213,17 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
                 + self.parameters_df[parameter_name + r"_2"] * self.distance
             )
     
-    # def get_yearly_flows(self):
-    #     """
-    #     Returns a DataFrame with yearly flows for each direction of the transport asset.
-    #     Skips years where the asset is not yet operational.
-    #     """
-    #     self._get_year_change_indices()
-    #     project_years = self.num_years
-    #     data = {}
-    #     source = self.source_node_location
-    #     target = self.target_node_location
-    #     # The earliest time the asset starts operating
-    #     first_operational_hour = self.source_node_times[0] if len(self.source_node_times) > 0 else float('inf')
-    
-    #     for y in range(project_years):
-    #         start_idx = self.year_change_indices[y]
-    #         end_idx = self.year_change_indices[y + 1] #if y + 1 < len(self.year_change_indices) else self.number_of_edges
-    
-    #         # Skip this year if it's entirely before the asset becomes active
-    #         if end_idx <= first_operational_hour:
-    #             continue
-    #         print("Starting to record flows at index", y, "which is hour,", self.year_change_indices[y])
-    #         difference = end_idx - start_idx 
-    #         print("Hours per year:", difference)
-    #         forward_flow = self.flows[start_idx:end_idx].value
-    #         reverse_flow = self.flows[self.number_of_edges + start_idx: self.number_of_edges + end_idx].value
-
-    #         data[f"{source}-{target}_year_{y}"] = forward_flow
-    #         data[f"{target}-{source}_year_{y}"] = reverse_flow
-    
-    #     return pd.DataFrame(data)
-    
     def get_yearly_flows(self):
         """
         Returns a DataFrame with yearly flows for each direction of the transport asset.
         Skips years beyond the transport asset's defined time window.
         """
         self._get_year_change_indices()
+        year_indices = self.year_change_indices.copy()
         source = self.source_node_location
         target = self.target_node_location
+        sampled_year_hours = year_indices[1] - year_indices[0]
+        reverse_flow_offset = sampled_year_hours * 10 # Assumes always a 10 year lead time for HVDC installation
        # first_operational_hour = self.source_node_times[0] #if len(self.source_node_times) > 0 else float('inf')
     
         data = {}
@@ -296,21 +232,34 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         # Determine number of actual available years based on flow array length
         max_index = len(self.flows.value) / 2
         year_limits = []
-        for y in range(len(self.year_change_indices) - 1):
-            if self.year_change_indices[y] < max_index:
+        for y in range(len(year_indices) - 1):
+            if year_indices[y] < max_index:
                 year_limits.append(y)
         
-        for y in year_limits:
-            real_year = y + 10  # Adjust based on your model's timeline
-            start_idx = self.year_change_indices[y]
-            end_idx = self.year_change_indices[y + 1]
-            
-            # Clip end_idx in case it goes beyond the available flow length
-            end_idx = min(end_idx, max_index)
-    
-            forward_flow = self.flows[start_idx:end_idx].value
-            reverse_flow = self.flows[self.number_of_edges + start_idx : self.number_of_edges + end_idx].value
-    
+        for y in range(len(year_indices) - 1):
+            real_year = y  # actual model year (0-based)
+            start_idx = year_indices[y]
+            end_idx = year_indices[y + 1]
+        
+            if y < 10:  # before operations start, hardcoded, needs to be depending on source node times
+                print(f"Start index at {y}:", start_idx)
+                print(f"End index at {y}:", end_idx)
+                # forward_flow = self.flows[start_idx:end_idx].value
+                # reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
+                # print(f"Forward flow value in year {y}", forward_flow)
+                # print(f"Year {y}: forward_flow shape {forward_flow.shape}")
+                # print(f"Year {y}: reverse_flow shape {reverse_flow.shape}")
+                forward_flow = np.full(end_idx - start_idx, 0)
+                reverse_flow = np.full(end_idx - start_idx, 0)
+            else:
+                start_idx = year_indices[y - 10]
+                end_idx = year_indices[y - 9]
+                print(f"Start index at {y}:", start_idx)
+                print(f"End index at {y}:", end_idx)
+                forward_flow = self.flows[start_idx:end_idx].value
+                reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
+                # print(f"Year {y}: forward_flow shape {forward_flow.shape}")
+                # print(f"Year {y}: reverse_flow shape {reverse_flow.shape}")
             data[f"{source}-{target}_year_{real_year}"] = forward_flow
             data[f"{target}-{source}_year_{real_year}"] = reverse_flow
     

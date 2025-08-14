@@ -23,15 +23,14 @@ from Code.Results import Results
 # sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
 sample_sizes = [4320]
 
-case_study_name = "MEX_30y_MY_69120"
-# case_study_name = "MEX_30y_MY_no_CO2_budget"
+# case_study_name = "MEX_34560"
+# case_study_name = "three_countries_no_emissions_constraint4320"
+case_study_name = "three_country_Autarky"
 # case_study_name = "MEX-CHL_Collab"
 
 for sample in sample_sizes:
     
     # case_study_name = f"MEX_30y_MY_{sample}"
-    
-    
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
     case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
@@ -112,7 +111,7 @@ for sample in sample_sizes:
                     })
     
     
-        ######## Print Results ############
+        ######## Get and save Results ############
         print("====================== Results =========================")
         print("Scenario: ", my_network.scenario_name)
         print("Time taken to build, update and solve problem = ", full_time, "s")
@@ -127,33 +126,45 @@ for sample in sample_sizes:
         emissions_reduction = my_network.assets[0].asset_size()
         scenario_name = my_network.scenario_name
         emissions_dict[scenario_name] = emissions_reduction
-    
+        sampled_days = int((network_structure_df["End_Time"][0] / 24) / 30)
+        simulation_factor = 365 / sampled_days
         if my_network.problem.value != float("inf"):
               
             yearly_path = os.path.join(case_study_folder, f"all_flows_yearly_{scenario_name}.csv")
-            Results.save_yearly_flows_to_csv(my_network, yearly_path)
-            if case_study_name.endswith("_Collab") or case_study_name.endswith("_Autarky"):
-                DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name, results_folder)
+
+            if case_study_name.endswith("_Autarky"):
+                DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name, 
+                                                                     location_parameters_df, results_folder)
+                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY", results_folder,
+                                                             tech_name_1="PV", tech_name_2="Wind")
+                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor)
+                time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+            elif case_study_name.endswith("_Collab"):
+                Results.save_yearly_flows_to_csv_multiloc(my_network, location_parameters_df, yearly_path)
+                DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name,
+                                                                     location_parameters_df, results_folder)
+                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY", results_folder,
+                                                             tech_name_1="PV", tech_name_2="Wind")
+                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor)
+                time_series_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
             else:
-                DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
+                Results.save_yearly_flows_to_csv(my_network, yearly_path)
+                # DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
                 DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
+                DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
         
-        # DPhil_Plotting.get_install_pathways(my_network.assets[1], results_folder, tech_name="PV")
-        # DPhil_Plotting.get_install_pathways(my_network.assets[2], results_folder, tech_name="Wind")
-        DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
+                time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
+                time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+                summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
         
-        time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
-        time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
-        summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
-        
-        save_path_lcoe = os.path.join(results_folder, "lcoe_per_year.csv")
-        save_path_gef = os.path.join(results_folder, "gef_per_year.csv")
-        lcoe = Results.get_lcoe_per_year(my_network, save_path_lcoe)
-        grid_emissions_factor = Results.get_grid_intensity(my_network, save_path_gef)
-    
-        emissions_df = pd.DataFrame(emissions_dict)
-        # Save to CSV
-        emissions_df.to_csv(os.path.join(scenario_folder, "all_scenarios_emissions.csv"), index=False)
+                save_path_lcoe = os.path.join(results_folder, "lcoe_per_year.csv")
+                save_path_gef = os.path.join(results_folder, "gef_per_year.csv")
+                lcoe = Results.get_lcoe_per_year(my_network, save_path_lcoe)
+                grid_emissions_factor = Results.get_grid_intensity(my_network, save_path_gef)
+            
+                emissions_df = pd.DataFrame(emissions_dict)
+                # Save to CSV
+                emissions_df.to_csv(os.path.join(scenario_folder, "all_scenarios_emissions.csv"), index=False)
     print("Saved emissions reductions to 'all_scenarios_emissions.csv'")
     runtimes_df = pd.DataFrame(runtimes)
     runtimes_df.to_csv(os.path.join(case_study_folder, "runtimes.csv"), index=False)

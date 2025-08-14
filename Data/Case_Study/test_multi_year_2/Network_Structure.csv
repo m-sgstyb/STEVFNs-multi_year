@@ -1,6 +1,0 @@
-Asset_Number,Asset_Class,Location_1,Location_2,Start_Time,End_Time,Period,Transport_Time
-0,CO2_Budget_MY,0,0,0,2160,1,0
-1,PP_CO2_MY,0,0,0,2160,1,0
-2,EL_Demand_MY,0,0,0,2160,1,0
-3,RE_WIND_MY,0,0,0,2160,1,0
-4,RE_PV_MY,0,0,0,2160,1,0

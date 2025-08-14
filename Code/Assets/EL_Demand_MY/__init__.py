@@ -148,7 +148,8 @@ class EL_Demand_MY_Asset(Asset_STEVFNs):
             flows_full = np.array(flows_full)
     
         # Final slicing using year_change_indices
-        year_indices = self.year_change_indices
+        year_indices = self.year_change_indices.copy()
+        year_indices = year_indices + [len(self.flows.value)]
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        
+        yearly_flows = [flow for flow in yearly_flows]
         return yearly_flows

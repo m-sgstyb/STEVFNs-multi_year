@@ -1,6 +1,0 @@
-Type,sizing_constant,sizing_constant_unit,lifespan,lifespan_unit,RE_type,set_size,set_number,existing_capacity,existing_capacity_unit,location_name,description
-0,0,G$/GWp,175200,h,PVOUT,24,0,6.695,GWp,MX,first
-1,0,G$/GWp,175200,h,PVOUT,24,0,84.33631887473805,GWp,MX,2030
-2,0,G$/GWp,175200,h,PVOUT,24,0,130.3147229,GWp,MX,2040
-3,0,G$/GWp,175200,h,PVOUT,24,0,45.9334,GWp,US,
-4,0,G$/GWp,175200,h,PVOUT,24,0,3.229,GWp,CL,

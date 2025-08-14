@@ -46,9 +46,12 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.existing_capacity_df = pd.DataFrame()
         # EDITED: Temporary initialization of cost and conversion function parameters,
         # shape defined in structure
-        self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
-        self.conversion_fun_params = {"existing_capacity": cp.Parameter(nonneg=True)}
-        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
+        self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True,
+                                                                name=f"cost_learning_curve_{self.asset_name}")}
+        self.conversion_fun_params = {"existing_capacity": cp.Parameter(nonneg=True,
+                                                                        name=f"existing_capacity_{self.asset_name}")}
+        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True,
+                                                                     name=f"max_capacity_{self.asset_name}")}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
                                                                        name=f"tech_potential_{self.asset_name}")}
         return
@@ -57,7 +60,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         self.asset_structure = asset_structure
         self.source_node_location = "NULL"
         self.target_node_location = asset_structure["Location_1"]
-        # Add node locations for edge 2
+        # Add node locations for edge 2 (max capacity)
         self.source_node_location_2 = "NULL"
         self.target_node_location_2 = asset_structure["Location_1"]
         
@@ -65,18 +68,17 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                                            asset_structure["End_Time"], 
                                            self.period)
         self.number_of_edges = len(self.target_node_times)
-        # self.asset_lifetime = int(self.parameters_df.loc["lifespan"] / 8760)
         # Define the number of years in the control horizon
         self.num_years = int(self.network.system_parameters_df.loc["control_horizon", "value"] / 8760)
         self.gen_profile = cp.Parameter(shape = (self.number_of_edges), nonneg=True, name=f"gen_profile_{self.asset_name}")
         # EDITED: set size of RE asset as array of sizes per horizon modeled
-        self.flows = cp.Variable(shape=(self.num_years,), nonneg=True, name=f"capacity_{self.asset_name}") # New capacities to install per year
+        self.flows = cp.Variable(shape=(self.num_years,), nonneg=True, name=f"new_capacity_{self.asset_name}") # New capacities to install per year
         self.cumulative_capacity = np.zeros(shape=(self.num_years,))
-        self.final_capacity = np.zeros(shape=(self.num_years,)) # Initialize dynamic, auxilliary variable with zeros
         self.cost_fun_params = {"sizing_constant": cp.Parameter(shape=(self.num_years,),
-                                                                nonneg=True)}
+                                                                nonneg=True,
+                                                                name=f"cost_learning_curve_{self.asset_name}")}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(shape=(self.num_years,),
-                                                                nonneg=True, name=f"existingcap_{self.asset_name}"),}
+                                                                nonneg=True, name=f"existing_cap_{self.asset_name}"),}
         self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True)}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
@@ -112,7 +114,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # This multiplies each flow by its active years
         self.cumulative_new_installed = cp.matmul(lifetime_mask, self.flows)
         
-        new_edge.flow = (self.cumulative_new_installed[index_number] + self.conversion_fun_params["existing_capacity"][index_number])\
+        new_edge.flow = (self.cumulative_new_installed[index_number] + 
+                         self.conversion_fun_params["existing_capacity"][index_number])\
             * self.gen_profile[edge_number]
         return
     
@@ -202,15 +205,15 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         '''
     
         # Cost per year (learning curve)
-        cost_array = np.array([
-            0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
-            0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
-            0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
-            0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
-            0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
-            0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
-        ])  # or pass it in
-    
+        # cost_array = np.array([
+        #     0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
+        #     0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
+        #     0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
+        #     0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
+        #     0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
+        #     0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
+        # ])
+        cost_array = self.cost_fun_params["sizing_constant"]
         asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
@@ -291,11 +294,11 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # print("Days per year", days_per_year)
         # --- Build new profile ---
         new_profile = []
-    
+        # Sample evenly spaced days across each sampled year
         for year in range(n_years):
             year_start = year * hours_per_year
             for d in range(days_per_year):
-                # Spread days evenly across the year
+                # Spread days evenly across the sampled year
                 day_idx = int((d + 0.5) * hours_per_year / days_per_year / hours_per_day)
                 hour_idx = year_start + day_idx * hours_per_day
                 new_profile.extend(full_profile[hour_idx:hour_idx + hours_per_day])
@@ -321,11 +324,11 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         return total_flows 
     
     def size(self):
-        # Returns size of asset for Existing RE, which is a vector #
+        # Returns size of asset for Total installed RE, which is a vector #
         return self.flows.value
     
     def asset_size(self):
-        # Returns size of asset for Existing RE, which is a vector #
+        # Returns size of asset for Total installed RE, which is a vector #
         return self.flows.value
     
     def get_asset_sizes(self):
@@ -346,8 +349,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         """
         Returns a list of flow slices split by each year using year_change_indices.
         """
-        sampled_days = int((self.number_of_edges / 24) / self.num_years) # sampled days per year in horizon
-        simulation_factor = 365 / sampled_days
         # Ensure indices are available
         if not hasattr(self, "year_change_indices"):
             if hasattr(self, "_get_year_change_indices"):
@@ -360,12 +361,11 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         # Guard against None or unexpected shape
         if flows_full is None:
             raise ValueError("Flow values not assigned yet.")
-        
         if not isinstance(flows_full, np.ndarray):
             flows_full = np.array(flows_full)
     
         # Final slicing using year_change_indices
         year_indices = list(self.year_change_indices) + [len(flows_full)]
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        yearly_flows = [flow * simulation_factor for flow in yearly_flows]
+        yearly_flows = [flow for flow in yearly_flows]
         return yearly_flows

@@ -34,11 +34,13 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     
     @staticmethod
     def conversion_fun_2(flows, params):
+        # Conversion function for emissions
         CO2_emissions_factor = params["CO2_emissions_factor"]
         return -CO2_emissions_factor * flows
     
     @staticmethod
     def conversion_fun_3(flows, params):
+        # Conversion function to limit by existing capacity
         existing_capacity = params["existing_capacity"]
         return existing_capacity - cp.max(flows)
     
@@ -84,7 +86,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         source_node_type = self.source_node_type
         target_node_type = self.target_node_type_2
         source_node_location = self.source_node_location
-        target_node_location = source_node_location  # Assuming same loc
+        target_node_location = 0  # Assuming global co2 budget in location 0
+        # target_node_location = source_node_location # assuming individual CO2 budgets in each country when collaborating
     
         source_node_time = year_number
         target_node_time = year_number
@@ -103,7 +106,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         yearly_emissions = self.conversion_fun_2(yearly_flows, self.conversion_fun_params_2)
         yearly_emissions_sum = cp.sum(yearly_emissions)
         
-        # Scale emissions from sampled to full year
+        # Scale emissions from sampled hours to full year
         hours_per_day = 24
         n_years = self.num_years
         sampled_days = int((self.number_of_edges / hours_per_day) / n_years) # (sampled hours / hours per day) / project life
@@ -123,7 +126,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
             edge.attach_target_node(
                 self.network.extract_node(target_node_location, target_node_type, target_node_time)
             )
-        edge.flow = yearly_emissions_sum
+        edge.flow = yearly_emissions_sum # scaled emissions to full year from sampled size
 
     def build_edge_3(self):
         '''Build edge to limit hourly peak generation'''
@@ -179,7 +182,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         # Apply NPV discounting and simulation scaling
         discount_factors = (1 / (1 + discount_rate)) ** np.arange(num_years)
         yearly_costs = raw_costs * discount_factors * simulation_factor
-        # Expand to full-length vector over number_of_edges to broadcast properly with flows
+        # Expand to full-length vector over number_of_edges to broadcast properly with flows, constant cost per hour each year
         year_indices = self._get_year_change_indices() + [self.number_of_edges]
         expanded_costs = np.zeros(self.number_of_edges)
     
@@ -207,8 +210,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     
         # Final slicing using year_change_indices
         year_indices = self.year_change_indices.copy()
-        # year_indices = self.year_change_indices + [self.number_of_edges] # for gef and lcoe methods but not for export_scenario_results
-        print(year_indices)
+        year_indices += [self.number_of_edges] 
         yearly_costs = [
             np.sum(total_hourly_costs[start:end])
             for start, end in zip(year_indices[:-1], year_indices[1:])
@@ -230,7 +232,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
             parameter.value = self.parameters_df[parameter_name]
         for parameter_name, parameter in self.conversion_fun_params_3.items():
             parameter.value = self.parameters_df[parameter_name]
-        #Update cost parameters based on NP, simulation sample, and expand for broadcasting asset cost#
+        #Update cost parameters based on NPV, simulation sample, and expand for broadcasting asset cost#
         self._update_usage_constants()
         return
     
@@ -255,7 +257,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         return {asset_identity: asset_size}
     
     def get_yearly_emissions(self):
-        # define indices for emissions edges
+        # define indices for emissions edges, hardcoded for this asset
+        # self.edges[:self.number_of_edges] corresponds to asset optimisation variable, hourly power flows
         emissions_edges_start = self.number_of_edges
         emissions_edges_end = self.number_of_edges + self.num_years
         annual_emissions = [-self.edges[i].flow.value for i in range(emissions_edges_start,
@@ -264,10 +267,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
     
     def get_yearly_flows(self):
         """
-        Returns a list of flow slices split by each year using year_change_indices.
+        Returns a list of flow slices split by each year using year_change_indices
         """
-        sampled_days = int((self.number_of_edges / 24) / self.num_years) # sampled days per year in horizon
-        simulation_factor = 365 / sampled_days
         # Ensure indices are available
         if not hasattr(self, "year_change_indices"):
             if hasattr(self, "_get_year_change_indices"):
@@ -280,14 +281,12 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         # Guard against None or unexpected shape
         if flows_full is None:
             raise ValueError("Flow values not assigned yet.")
-        
         if not isinstance(flows_full, np.ndarray):
             flows_full = np.array(flows_full)
     
         # Final slicing using year_change_indices
-        year_indices = self.year_change_indices
-        # year_indices = self.year_change_indices + [self.number_of_edges] # gets correct length for lcoe calculation
+        year_indices = self.year_change_indices.copy() + [self.number_of_edges] # gets correct length for lcoe calculation
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        yearly_flows = [flow * simulation_factor for flow in yearly_flows]
+        yearly_flows = [flow for flow in yearly_flows]
         return yearly_flows
                 

@@ -7,10 +7,12 @@ Created on Fri Nov 29 18:43:22 2024
 
 import pandas as pd
 import numpy as np
+import matplotlib
+import itertools
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from collections import defaultdict
 import os
+from collections import defaultdict
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
 from Code.Results import get_new_input_params
@@ -185,12 +187,10 @@ def approximate_scurve_derivative(case_study_folder, tech_lim, assets_folder,
     derivative_values = linear_approximation(derivative_years, m, b)
     return derivative_years, derivative_values
     
-    
 def plot_scurves(case_study_folder, tech_lim, assets_folder,
                  goal_capacity, goal_year, historical_data_file):
     '''
     
-
     Parameters
     ----------
     case_study_folder : TYPE
@@ -383,13 +383,11 @@ def plot_yearly_flows(network, output_folder):
     
     print(f"[✓] Plots saved to folder: {output_folder}")
     
-    
 def plot_yearly_flows_stacked(network, output_folder):
-
     os.makedirs(output_folder, exist_ok=True)
     
     tech_order = ["pp", "wind", "pv"]
-    tech_colors = {"pp": "#1f77b4", "wind": "#2ca02c", "pv": "#ff7f0e"}
+    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
     demand_color = "red"
     
     # Collect flows by tech and demand by year
@@ -400,7 +398,7 @@ def plot_yearly_flows_stacked(network, output_folder):
         if not hasattr(asset, "get_yearly_flows"):
             continue
         try:
-            yearly_chunks = asset.get_yearly_flows()
+            yearly_chunks = asset.get_yearly_flows()[:30]
         except Exception:
             continue
     
@@ -412,7 +410,7 @@ def plot_yearly_flows_stacked(network, output_folder):
                 if tech in name:
                     tech_flows_by_year[tech].append(yearly_chunks)
                     break
-    
+    print("length of demand by year", len(demand_by_year))
     num_years = len(demand_by_year)
     for year in range(num_years):
         demand = np.array(demand_by_year[year])
@@ -473,83 +471,144 @@ def plot_yearly_flows_stacked(network, output_folder):
     
     print(f"[✓] Stacked plots saved to: {output_folder}")
 
-def plot_yearly_flows_stacked_by_location(network, case_study_name, output_folder):
+def plot_yearly_flows_stacked_by_location(network, case_study_name, location_parameters_df,
+                                          output_folder):
     os.makedirs(output_folder, exist_ok=True)
+    # --- config ---
+    if case_study_name.endswith("_Collab"):
+        tech_order = ["pp", "transport", "wind", "pv"]  # 'transport' is an ordering placeholder
+    else:
+        tech_order = ["pp", "wind", "pv"]
 
-    tech_order = ["pp", "wind", "pv"]
-    tech_colors = {"pp": "#1f77b4", "wind": "#2ca02c", "pv": "#ff7f0e"}
+    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C", "transport": "#047315"}
     demand_color = "red"
 
-    
-    if case_study_name.endswith("_Collab"):
-        tech_order = ["pp", "transport", "wind", "pv"]
-        tech_colors["transport"] = "#9467bd"  # purple
+    # Use dict for inner level to avoid autovivification
+    flows_by_loc = defaultdict(dict)      # loc -> { "pp": [arrs], "HVDC A-B": [arrs], ... }
+    demand_by_loc = {}                    # loc -> [year_arrays]
 
-    # Store flows and demand by location
-    flows_by_loc = defaultdict(lambda: defaultdict(list))
-    demand_by_loc = defaultdict(list)
+    print("🔍 Collecting yearly flows by location...")
 
     for asset in network.assets:
         if not hasattr(asset, "get_yearly_flows"):
             continue
+
+        name = getattr(asset, "asset_name", "").lower()
+
+        # Pull data (EL_Transport returns 60 columns; others capped at 30)
         try:
-            yearly_chunks = asset.get_yearly_flows()
-        except Exception:
+            if case_study_name.endswith("_Collab") and "el_transport" in name:
+                yearly_chunks = asset.get_yearly_flows()
+            else:
+                yearly_chunks = asset.get_yearly_flows()[:30]
+        except Exception as e:
+            print(f"⚠️ Skipping asset {getattr(asset, 'asset_name', 'unknown')} due to error: {e}")
             continue
 
-        name = asset.asset_name.lower()
-
-        # Handle EL_Transport separately
+        # --- EL_Transport: store by HVDC label per direction ---
         if case_study_name.endswith("_Collab") and "el_transport" in name:
             df = yearly_chunks
-            # target_loc = asset.source_node_location #EL_Transport is defined only from one loc to another and internally builds reverse flows
-
             for col in df.columns:
+                parts = col.split("_year_")
+                if len(parts) != 2:
+                    continue
                 try:
-                    real_year = int(col.split("_year_")[1])  # e.g., 10, 11, ...
+                    real_year = int(parts[1])
                 except Exception:
                     continue
-        
-                # Determine direction to choose target node
-                direction = col.split("_year_")[0]  # e.g., "3-0" or "0-3"
+
+                direction = parts[0]
                 try:
                     source_id, target_id = map(int, direction.split("-"))
                 except Exception as e:
-                    print("was not able to get source_id or target_id. Exception:", e)
+                    print(f"⚠️ Could not parse source/target from '{direction}': {e}")
                     continue
-        
-                # This direction ends at `target_id`, so we use it as the plot location
-                loc = target_id
-                flow = df[col]
-        
-                while len(flows_by_loc[loc]["transport"]) <= real_year:
-                    flows_by_loc[loc]["transport"].append(np.zeros_like(flow))
-        
-                flows_by_loc[loc]["transport"][real_year] += np.nan_to_num(flow)
-        
-                continue
-        
-        # Identify location
-        if hasattr(asset, "target_node_location"):
-            loc = asset.target_node_location
-        elif hasattr(asset, "node_location"):
-            loc = asset.node_location
-        else:
-            continue  # Skip asset without known location
+
+                src = location_parameters_df.iloc[source_id]["location_name"]
+                tgt = location_parameters_df.iloc[target_id]["location_name"]
+                label = f"HVDC {src}-{tgt}"
+
+                flow = np.asarray(df[col])
+                years_list = flows_by_loc[target_id].setdefault(label, [])
+                while len(years_list) <= real_year:
+                    years_list.append(np.zeros_like(flow))
+                years_list[real_year] = years_list[real_year] + np.nan_to_num(flow)
+            continue  # handled
+
+        # --- Non-transport assets ---
+        loc = getattr(asset, "target_node_location", getattr(asset, "node_location", None))
+        if loc is None:
+            continue
 
         if "demand" in name:
             demand_by_loc[loc] = yearly_chunks
         else:
+            # add under first matching tech, but NEVER create a 'transport' key here
             for tech in tech_order:
+                if tech == "transport":
+                    continue
                 if tech in name:
-                    tech = tech.lower()
-                    flows_by_loc[loc][tech].append(yearly_chunks)
+                    flows_by_loc[loc].setdefault(tech, []).append(yearly_chunks)
                     break
+        
+        
+        # Function to get a direction-independent key
+    def normalize_hvdc_label(label):
+        # label format assumed "HVDC SRC-TGT"
+        try:
+            _, route = label.split(" ", 1)
+            src, tgt = route.split("-")
+            return "HVDC " + "-".join(sorted([src.strip(), tgt.strip()]))
+        except ValueError:
+            return label.strip()
+    
+    # Collect all unique normalized HVDC routes
+    normalized_routes = sorted({
+        normalize_hvdc_label(k)
+        for loc_data in flows_by_loc.values()
+        for k in loc_data
+        if k.startswith("HVDC ")
+    })
+    # Group by normalized route
+    hvdc_groups = {}
+    # Get all HVDC labels
+    hvdc_labels = sorted({
+        k
+        for loc_data in flows_by_loc.values()
+        for k in loc_data
+        if k.startswith("HVDC ")
+    })
+    for lbl in hvdc_labels:
+        norm = normalize_hvdc_label(lbl)
+        hvdc_groups.setdefault(norm, []).append(lbl)
+    # Assign colors
+    hvdc_colors = {}
+    for norm_route, labels in hvdc_groups.items():
+        if len(normalized_routes) > 1:
+            # color_cycle = itertools.cycle(matplotlib.cm.tab20.colors)
+            shades = ["#047315", "#6DC27A"]  # dark green, light green
+            for lbl, shade in zip(sorted(labels), shades):
+                hvdc_colors[lbl] = shade
+        else:
+            # Single link → default transport green
+            hvdc_colors[labels[0]] = "#047315"
+                    
+    # --- Optional summary without creating keys accidentally ---
+    print("\n📊 Data summary per location:")
+    for loc in sorted(demand_by_loc.keys()):
+        print(f"  Location {loc}:")
+        print(f"    Demand years: {len(demand_by_loc[loc])}")
+        for tech in tech_order:
+            if tech == "transport":
+                hvdc_count = sum(1 for k in flows_by_loc.get(loc, {}) if k.startswith("HVDC "))
+                print(f"    transport assets (HVDC links): {hvdc_count}")
+            else:
+                print(f"    {tech} assets: {len(flows_by_loc.get(loc, {}).get(tech, []))}")
 
-    # Plot per location
-    for loc in demand_by_loc:
-        tech_flows = flows_by_loc[loc]
-        demand_by_year = demand_by_loc[loc]
+    # --- Plot per location ---
+    for loc, demand_by_year in demand_by_loc.items():
+        loc_name = location_parameters_df.iloc[loc]["location_name"]
+        tech_flows = flows_by_loc.get(loc, {})
         num_years = len(demand_by_year)
 
         for year in range(num_years):
@@ -559,61 +618,96 @@ def plot_yearly_flows_stacked_by_location(network, case_study_name, output_folde
             bottom = np.zeros_like(demand)
 
             plt.figure(figsize=(14, 6))
+            seen_labels = set()
 
             for tech in tech_order:
-                tech_total = np.zeros_like(demand)
-
-                flows_list = tech_flows.get(tech, [])
-
                 if tech == "transport":
-                    # Only add if transport exists and year index is valid
-                    if year < len(flows_list):
-                        transport_flow = flows_list[year]
-                        if len(transport_flow) == len(demand):
-                            tech_total += np.nan_to_num(transport_flow)
-                        else:
-                            print(f"⚠️ Transport flow shape mismatch in year {year} at loc {loc}")
+                    # Plot ALL HVDC labels at this location in the 'transport' slot
+                    hvdc_labels = [k for k in tech_flows.keys() if k.startswith("HVDC ")]
+                    # stable order
+                    hvdc_labels.sort()
+                    for label in hvdc_labels:
+                        flows_list = tech_flows[label]
+                        tech_total = np.zeros_like(demand)
+                        if year < len(flows_list):
+                            flow_year = np.array(flows_list[year])
+                            # pad/trim to match demand
+                            if flow_year.shape[0] != demand.shape[0]:
+                                if flow_year.shape[0] > demand.shape[0]:
+                                    flow_year = flow_year[:demand.shape[0]]
+                                else:
+                                    flow_year = np.pad(flow_year, (0, demand.shape[0]-flow_year.shape[0]), constant_values=0)
+                            tech_total += np.nan_to_num(flow_year)
+
+                        if not np.any(tech_total):
+                            continue  # nothing to draw
+
+                        used = np.minimum(tech_total, remaining_demand)
+                        excess = tech_total - used
+
+                        lbl = None if label in seen_labels else label
+                        plt.fill_between(
+                            x, bottom, bottom + used,
+                            color = hvdc_colors.get(label, tech_colors["transport"]),
+                            label=lbl, alpha=1.0, edgecolor='none'
+                        )
+                        plt.fill_between(
+                            x, bottom + used, bottom + used + excess,
+                            color = hvdc_colors.get(label, tech_colors["transport"]),
+                            alpha=0.3, edgecolor='none'
+                        )
+
+                        seen_labels.add(label)
+                        bottom += tech_total
+                        remaining_demand = np.clip(remaining_demand - used, 0, None)
                 else:
-                    for flows in flows_list:
-                        if year < len(flows):
-                            flow_year = np.array(flows[year])
-                            if flow_year.shape != demand.shape:
-                                print(f"⚠️ Flow shape mismatch in year {year} for tech {tech} at loc {loc}: "
-                                      f"expected {demand.shape}, got {flow_year.shape}")
-                            tech_total += flow_year
+                    # Sum all assets of this tech
+                    flows_list_collection = tech_flows.get(tech, [])
+                    tech_total = np.zeros_like(demand)
+                    for flows_list in flows_list_collection:
+                        if year < len(flows_list):
+                            flow_year = np.array(flows_list[year])
+                            if flow_year.shape[0] != demand.shape[0]:
+                                if flow_year.shape[0] > demand.shape[0]:
+                                    flow_year = flow_year[:demand.shape[0]]
+                                else:
+                                    flow_year = np.pad(flow_year, (0, demand.shape[0]-flow_year.shape[0]), constant_values=0)
+                            tech_total += np.nan_to_num(flow_year)
 
-                used = np.minimum(tech_total, remaining_demand)
-                excess = tech_total - used
+                    if not np.any(tech_total):
+                        continue
 
-                plt.fill_between(x, bottom, bottom + used,
-                                 color=tech_colors[tech],
-                                 label=tech.capitalize(),
-                                 alpha=1.0,
-                                 edgecolor='none')
+                    used = np.minimum(tech_total, remaining_demand)
+                    excess = tech_total - used
 
-                plt.fill_between(x, bottom + used, bottom + used + excess,
-                                 color=tech_colors[tech],
-                                 alpha=0.3,
-                                 edgecolor=tech_colors[tech])
+                    label = tech.capitalize()
+                    lbl = None if label in seen_labels else label
+                    plt.fill_between(x, bottom, bottom + used,
+                                     color=tech_colors[tech], label=lbl,
+                                     alpha=1.0, edgecolor='none')
+                    plt.fill_between(x, bottom + used, bottom + used + excess,
+                                     color=tech_colors[tech], alpha=0.3, edgecolor='none')
 
-                bottom += tech_total
-                remaining_demand -= used
-                remaining_demand = np.clip(remaining_demand, 0, None)
+                    seen_labels.add(label)
+                    bottom += tech_total
+                    remaining_demand = np.clip(remaining_demand - used, 0, None)
 
-            plt.plot(x, demand, color=demand_color, label="Demand",
+            # demand line
+            plt.plot(x, demand, color=demand_color, label=None if "Demand" in seen_labels else "Demand",
                      linestyle="--", linewidth=1.5)
+            seen_labels.add("Demand")
 
-            plt.title(f"Location {loc} – Stacked Generation vs Demand – Year {year}")
+            plt.title(f"{loc_name} – Stacked Generation vs Demand – Year {year}")
             plt.xlabel("Hour")
             plt.ylabel("Power Flow")
             plt.grid(True)
             plt.legend()
             plt.tight_layout()
-            plt.savefig(os.path.join(output_folder, f"stacked_loc_{loc}_year_{year}.png"))
+            plt.savefig(os.path.join(output_folder, f"stacked_{loc_name}_year_{year}.png"))
             plt.close()
 
-        print(f"[✓] Plots for location {loc} saved to: {output_folder}")
-    
+        print(f"[✓] Plots for {loc_name} saved to: {output_folder}")
+
 def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
     """
     Plots installed capacity pathways for a technology asset (wind/solar).
@@ -635,7 +729,7 @@ def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(years, new_installed, label="New Installed Capacity", color="skyblue")
+    ax.bar(years, new_installed, label="New Installed Capacity", color="#025773")
     ax.plot(years, total_existing, color="navy", linewidth=2, marker="o", label="Total Existing Capacity")
 
     ax.set_title(f"{tech_name} Capacity Installation Pathway")
@@ -681,12 +775,12 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
     ax2 = ax1.twinx()
 
     # Plot bars (new installs)
-    bars1 = ax1.bar(years - width/2, new_1, width=width, label=f"{tech_name_1}", color="skyblue")
-    bars2 = ax1.bar(years + width/2, new_2, width=width, label=f"{tech_name_2}", color="lightcoral")
+    bars1 = ax1.bar(years - width/2, new_1, width=width, label=f"{tech_name_1}", color="#F0843C", alpha=0.5)
+    bars2 = ax1.bar(years + width/2, new_2, width=width, label=f"{tech_name_2}", color="#025773", alpha=0.5)
 
     # Plot lines (total capacity)
-    line1, = ax2.plot(years, total_1, color="navy", marker="o", linewidth=2, label=f"{tech_name_1}")
-    line2, = ax2.plot(years, total_2, color="darkred", marker="s", linewidth=2, label=f"{tech_name_2}")
+    line1, = ax2.plot(years, total_1, color="#B14B07", marker="o", linewidth=2, label=f"{tech_name_1}")
+    line2, = ax2.plot(years, total_2, color="#02384A", marker="s", linewidth=2, label=f"{tech_name_2}")
 
     # Axis labels and title
     ax1.set_xlabel("Year")
@@ -703,4 +797,82 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
 
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}.png"))
+    
+def plot_dual_install_pathways_all_locations(my_network, network_structure_df, tech_class_1, tech_class_2, save_path,
+                                             tech_name_1="Tech 1", tech_name_2="Tech 2"):
+    """
+    Plots installed capacity pathways for two technologies (e.g., PV & Wind) for all locations in the network.
+    
+    Parameters:
+    - my_network: The solved network object containing assets.
+    - network_structure_df: DataFrame with 'Asset_Class' and 'Location_1' columns.
+    - tech_class_1: Asset class name for first technology (e.g., "RE_PV_MY").
+    - tech_class_2: Asset class name for second technology (e.g., "RE_WIND_MY").
+    - save_path: Directory where plots will be saved.
+    - tech_name_1: Display name for first technology.
+    - tech_name_2: Display name for second technology.
+    """
+
+    unique_locations = sorted(network_structure_df["Location_1"].unique())
+
+    for loc in unique_locations:
+        # Find assets for this location and tech type
+        pv_row = network_structure_df[(network_structure_df["Location_1"] == loc) &
+                                      (network_structure_df["Asset_Class"] == tech_class_1)]
+        wind_row = network_structure_df[(network_structure_df["Location_1"] == loc) &
+                                        (network_structure_df["Asset_Class"] == tech_class_2)]
+
+        if pv_row.empty or wind_row.empty:
+            print(f"⚠ Skipping location {loc}: Missing {tech_class_1} or {tech_class_2}")
+            continue
+
+        pv_asset_num = pv_row["Asset_Number"].iloc[0]
+        wind_asset_num = wind_row["Asset_Number"].iloc[0]
+
+        pv_asset = my_network.assets[pv_asset_num]
+        wind_asset = my_network.assets[wind_asset_num]
+
+        # --- Extract data ---
+        new_pv = np.array(pv_asset.flows.value, dtype=float).flatten()
+        cum_pv = np.array(pv_asset.cumulative_new_installed.value, dtype=float).flatten()
+        exist_pv = np.array(pv_asset.conversion_fun_params["existing_capacity"].value, dtype=float).flatten()
+
+        new_wind = np.array(wind_asset.flows.value, dtype=float).flatten()
+        cum_wind = np.array(wind_asset.cumulative_new_installed.value, dtype=float).flatten()
+        exist_wind = np.array(wind_asset.conversion_fun_params["existing_capacity"].value, dtype=float).flatten()
+
+        total_pv = cum_pv + exist_pv
+        total_wind = cum_wind + exist_wind
+        years = np.arange(len(new_pv))
+        width = 0.35
+
+        # --- Plot ---
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax2 = ax1.twinx()
+
+        bars1 = ax1.bar(years - width/2, new_pv, width=width, label=f"{tech_name_1}", color="#F0843C", alpha=0.5)
+        bars2 = ax1.bar(years + width/2, new_wind, width=width, label=f"{tech_name_2}", color="#025773", alpha=0.5)
+
+        line1, = ax2.plot(years, total_pv,  color="#B14B07", marker="o", linewidth=2, label=f"{tech_name_1}")
+        line2, = ax2.plot(years, total_wind, color="#02384A", marker="s", linewidth=2, label=f"{tech_name_2}")
+
+        ax1.set_xlabel("Year")
+        ax1.set_ylabel("New Installed Capacity [GWp]", color="gray")
+        ax2.set_ylabel("Total Existing Capacity [GWp]", color="black")
+        ax1.set_title(f"Installed Capacity Pathways - Location {loc}")
+        ax1.set_xticks(years)
+        ax1.grid(True, linestyle="--", alpha=0.5)
+
+        # Legends
+        bar_legend = ax1.legend(handles=[bars1, bars2], title="New Installs", loc="upper left")
+        ax1.add_artist(bar_legend)
+        ax2.legend(handles=[line1, line2], title="Total Capacity", bbox_to_anchor=(0.15, 1), loc="upper left")
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}_location_{loc}.png"))
+        plt.close(fig)  # prevent memory leaks in large runs
+
+        print(f"✅ Saved plot for location {loc}")
+
+    
     

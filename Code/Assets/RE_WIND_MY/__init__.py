@@ -202,13 +202,15 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         '''
     
         # Cost per year (learning curve)
-        cost_array = np.array([1.2835973944705823,1.20310956244145,1.1313223980206035,1.0677793433734775,1.0119102964812567,
-                               0.9630779381406271,0.9206159970372159,0.8838590173417371,0.8521641165486235,0.8249257546673787,
-                               0.801584763549205,0.7816329019733418,0.7646140923071025,0.7501233226560129,0.7378040084937985,
-                               0.7273444264992114,0.7184736745171729,0.7109574803590637,0.7045940785086442,0.6992102949078827,
-                               0.6946579219265903,0.6908104242604939,0.6875599880763865,0.6848149070068594,0.6824972869739733,
-                               0.6805410452430902,0.6788901760181308,0.6774972541330668,0.6763221491340373,0.6753309236877535]) # Hard-coded for testing
+        # cost_array = np.array([1.2835973944705823,1.20310956244145,1.1313223980206035,1.0677793433734775,1.0119102964812567,
+        #                        0.9630779381406271,0.9206159970372159,0.8838590173417371,0.8521641165486235,0.8249257546673787,
+        #                        0.801584763549205,0.7816329019733418,0.7646140923071025,0.7501233226560129,0.7378040084937985,
+        #                        0.7273444264992114,0.7184736745171729,0.7109574803590637,0.7045940785086442,0.6992102949078827,
+        #                        0.6946579219265903,0.6908104242604939,0.6875599880763865,0.6848149070068594,0.6824972869739733,
+        #                        0.6805410452430902,0.6788901760181308,0.6774972541330668,0.6763221491340373,0.6753309236877535]) # Hard-coded for testing
     
+        
+        cost_array = self.cost_fun_params["sizing_constant"]
         asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
@@ -362,7 +364,8 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         # Final slicing using year_change_indices
         year_indices = list(self.year_change_indices) + [len(flows_full)]
         yearly_flows = [flows_full[start:end] for start, end in zip(year_indices[:-1], year_indices[1:])]
-        yearly_flows = [flow * simulation_factor for flow in yearly_flows]
+        # yearly_flows = [flow * simulation_factor for flow in yearly_flows]
+        yearly_flows = [flow for flow in yearly_flows]
         return yearly_flows
     
     def _get_install_pathways(self):
