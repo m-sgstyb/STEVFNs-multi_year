@@ -1,7 +1,18 @@
-# STEVFNs-DPhil-MSB
-This repository contains an application of the Space-Time Energy Vector Flow Networks [(STEVFNs)](https://github.com/OmNomNomzzz/STEVFNs) model, adapted for the case study in my doctoral thesis.
-As an application of the original software, this code is licensed under an MIT license (please see LICENSE and Citations.bib files for details).
+# STEVFNs-multi_year
+
+This repository contains an adaptation of the Space-Time Energy Vector Flow Networks [(STEVFNs)](https://github.com/OmNomNomzzz/STEVFNs) model, developed to model multi-year energy systems.
+As an application of the original software, this code is licensed under an MIT license (please see LICENSE file).
+
+> [!IMPORTANT]
+> If you use this adapted version of the STEVFNs framework in your research, please cite both:
+> 
+> 1. This repository and associated doctoral thesis (when published)
+> 2. The original STEVFNs Tool software and the associated doctoral thesis by Aniq Ahsan
+>
+> The direct GitHub link to "Cite this repository" will only display the APA and BibTex citations for this repository. For the full citations list, please see or download the citations.bib file.
+
 Please also see the NOTICE file to find the license for dependent software used in this model.
+
 ## Case Study
 The code and data here present a case study for long-distance HVDC interconnections for renewable energy trade in America, with a specific focus on Mexico, USA (Western Interconnection), and Chile. 
 ## Documentation
@@ -13,7 +24,7 @@ I recomment the use of conda package manager, installation instructions for diff
 git clone https://github.com/m-sgstyb/STEVFNs-DPhil-MSB.git
 ```
 
-Once Conda is installed and the repository cloned in your desired path locally, navigate to the cloned STEVFNs-DPhil-MSB folder in your terminal and run 
+Once Conda is installed and the repository cloned in your desired path locally, navigate to the cloned STEVFNs-multi_year folder in your terminal and run 
 ```
 conda env -f create environment.yaml
 ```

@@ -13,7 +13,7 @@ authors:
 identifiers:
   - type: url
     value: 'https://github.com/m-sgstyb/STEVFNs-multi_year'
-repository-code: 'https://github.com/OmNomNomzzz/STEVFNs'
+repository-code: 'https://github.com/m-sgstyb/STEVFNs-multi_year'
 license: MIT
 version: 1.0.0
 date-released: '2025-10-11'
@@ -37,4 +37,4 @@ references:
     title: "Generalized Spatio-Temporal Model for the Optimal Sizing, Operation, and Location of Energy System Assets"
     date-released: '2022'
     institution: University of Oxford
-    url: 'https://ora.ox.ac.uk/objects/uuid:fc64231e-524e-433f-9b32-b9ffe5b5f974"'
+    url: 'https://ora.ox.ac.uk/objects/uuid:fc64231e-524e-433f-9b32-b9ffe5b5f974'
