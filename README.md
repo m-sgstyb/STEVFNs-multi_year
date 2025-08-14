@@ -5,7 +5,7 @@
 
 
 This repository contains an adaptation of the Space-Time Energy Vector Flow Networks [(STEVFNs)](https://github.com/OmNomNomzzz/STEVFNs) model, developed to model multi-year energy systems.
-As an application of the original software, this code is licensed under an MIT license (please see LICENSE file).
+As an application of the original software, this code is licensed under an MIT license (please see [LICENSE](/LICENSE) file).
 
 > [!IMPORTANT]
 > If you use this adapted version of the STEVFNs framework in your research, please cite both:
@@ -13,7 +13,7 @@ As an application of the original software, this code is licensed under an MIT l
 > 1. This repository and associated doctoral thesis (when published)
 > 2. The original STEVFNs Tool software and the associated doctoral thesis by Aniq Ahsan
 >
-> The direct GitHub link to "Cite this repository" will only display the APA and BibTex citations for this repository. For the full citations list, please see or download the citations.bib file.
+> The direct GitHub link to "Cite this repository" will only display the APA and BibTex citations for this repository. For the full citations list, please see or download the [citations.bib](/citations.bib) file.
 
 Please also see the NOTICE file to find the license for dependent software used in this model.
 
