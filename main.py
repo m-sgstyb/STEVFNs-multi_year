@@ -25,10 +25,11 @@ sample_sizes = [4320]
 
 # case_study_name = "MEX_34560"
 # case_study_name = "three_countries_no_emissions_constraint4320"
-case_study_name = "three_country_Autarky"
+case_study_name = "two_country_Collab"
 # case_study_name = "MEX-CHL_Collab"
 
 for sample in sample_sizes:
+    
     
     # case_study_name = f"MEX_30y_MY_{sample}"
     base_folder = os.path.dirname(__file__)
@@ -135,18 +136,24 @@ for sample in sample_sizes:
             if case_study_name.endswith("_Autarky"):
                 DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name, 
                                                                      location_parameters_df, results_folder)
-                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY", results_folder,
+                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY",
+                                                                        results_folder,
                                                              tech_name_1="PV", tech_name_2="Wind")
-                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor)
+                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
+                                                                                           scenario_name, simulation_factor)
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+                summary_df.to_csv(os.path.join(results_folder, "summary_df.csv"))
             elif case_study_name.endswith("_Collab"):
                 Results.save_yearly_flows_to_csv_multiloc(my_network, location_parameters_df, yearly_path)
                 DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name,
                                                                      location_parameters_df, results_folder)
-                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY", results_folder,
+                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY",
+                                                                        results_folder,
                                                              tech_name_1="PV", tech_name_2="Wind")
-                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor)
-                time_series_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
+                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
+                                                                                           scenario_name, simulation_factor)
+                time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+                summary_df.to_csv(os.path.join(results_folder, "summary_df.csv"))
             else:
                 Results.save_yearly_flows_to_csv(my_network, yearly_path)
                 # DPhil_Plotting.plot_yearly_flows(my_network, results_folder)

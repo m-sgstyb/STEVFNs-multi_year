@@ -594,16 +594,16 @@ def plot_yearly_flows_stacked_by_location(network, case_study_name, location_par
             hvdc_colors[labels[0]] = "#047315"
                     
     # --- Optional summary without creating keys accidentally ---
-    print("\n📊 Data summary per location:")
-    for loc in sorted(demand_by_loc.keys()):
-        print(f"  Location {loc}:")
-        print(f"    Demand years: {len(demand_by_loc[loc])}")
-        for tech in tech_order:
-            if tech == "transport":
-                hvdc_count = sum(1 for k in flows_by_loc.get(loc, {}) if k.startswith("HVDC "))
-                print(f"    transport assets (HVDC links): {hvdc_count}")
-            else:
-                print(f"    {tech} assets: {len(flows_by_loc.get(loc, {}).get(tech, []))}")
+    # print("\n📊 Data summary per location:")
+    # for loc in sorted(demand_by_loc.keys()):
+    #     print(f"  Location {loc}:")
+    #     print(f"    Demand years: {len(demand_by_loc[loc])}")
+    #     for tech in tech_order:
+    #         if tech == "transport":
+    #             hvdc_count = sum(1 for k in flows_by_loc.get(loc, {}) if k.startswith("HVDC "))
+    #             print(f"    transport assets (HVDC links): {hvdc_count}")
+    #         else:
+    #             print(f"    {tech} assets: {len(flows_by_loc.get(loc, {}).get(tech, []))}")
 
     # --- Plot per location ---
     for loc, demand_by_year in demand_by_loc.items():
@@ -872,7 +872,7 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
         plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}_location_{loc}.png"))
         plt.close(fig)  # prevent memory leaks in large runs
 
-        print(f"✅ Saved plot for location {loc}")
+        print(f"✅ Saved  installed pathways plot for location {loc}")
 
     
     
