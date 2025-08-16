@@ -27,6 +27,9 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
     period = 1
     transport_time = 0
     target_node_time_2 = 0 # For Edge 2, to constrain maximum capacity
+    @staticmethod
+    def conversion_fun_2(flows, params):
+        return params["maximum_size"] - flows
     
     def build_cost(self):
         '''Re-define build_cost method for this asset to get amortised and discounted cost'''
@@ -124,13 +127,13 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         source_node_type = self.source_node_type_2
         source_node_location = self.source_node_location_2
         target_node_type = self.target_node_type_2
-        target_node_location = source_node_location
+        target_node_location = self.target_node_location_2
         
         source_node_time = 0
         target_node_time = year_number
         
         # Get the installed capacity in that year
-        installed_capacity = self.flows[year_number]
+        # installed_capacity = self.flows[year_number]
     
         # Create edge with balance = max_capacity - installed_capacity
         edge = Edge_STEVFNs()
@@ -146,14 +149,17 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
                 self.network.extract_node(target_node_location, target_node_type, target_node_time)
             )
         # Define flow as max capacity minus actual installed capacity
-        max_capacity_param = self.conversion_fun_params_2["maximum_size"]
-        edge.flow = max_capacity_param[year_number] - installed_capacity
+        # max_capacity_param = self.conversion_fun_params_2["maximum_size"]
+        # edge.flow = max_capacity_param[year_number] - installed_capacity
+        edge.flow = self.flows
+        edge.conversion_fun = self.conversion_fun_2
+        edge.conversion_fun_params = self.conversion_fun_params_2
         
     def build_tech_potential_edges(self, year_number):
         source_node_type = "NULL"
         source_node_location = self.source_node_location_2
         target_node_type = "RE_WIND_Tech"
-        target_node_location = source_node_location
+        target_node_location = self.target_node_location_2
         
         source_node_time = 0
         target_node_time = year_number
@@ -186,6 +192,7 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
             self.build_edge(hour)
         for year in range(self.num_years):
             self.build_max_capacity_edges(year)
+        for year in range(self.num_years):    
             self.build_tech_potential_edges(year)
         return
     
@@ -200,16 +207,6 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         '''
         Calculates total discounted and amortised cost scaled for representative timesteps.
         '''
-    
-        # Cost per year (learning curve)
-        # cost_array = np.array([1.2835973944705823,1.20310956244145,1.1313223980206035,1.0677793433734775,1.0119102964812567,
-        #                        0.9630779381406271,0.9206159970372159,0.8838590173417371,0.8521641165486235,0.8249257546673787,
-        #                        0.801584763549205,0.7816329019733418,0.7646140923071025,0.7501233226560129,0.7378040084937985,
-        #                        0.7273444264992114,0.7184736745171729,0.7109574803590637,0.7045940785086442,0.6992102949078827,
-        #                        0.6946579219265903,0.6908104242604939,0.6875599880763865,0.6848149070068594,0.6824972869739733,
-        #                        0.6805410452430902,0.6788901760181308,0.6774972541330668,0.6763221491340373,0.6753309236877535]) # Hard-coded for testing
-    
-        
         cost_array = self.cost_fun_params["sizing_constant"]
         asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
@@ -222,11 +219,9 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
     
         amortised_cost = cost_array * amort_factor  # shape (project_years,)
-    
         # Create index matrices for payment timing
         i, j = np.meshgrid(np.arange(project_years), np.arange(project_years), indexing='ij')
-        # discount_factor = (1 + discount_rate) ** (i - j) # This was discounting to year j, not year 0
-        discount_factor = (1 + discount_rate) ** i # This discounts to year 0
+        discount_factor = (1 + discount_rate) ** i # Discounting to year 0
         valid_mask = (i >= j) & (i < j + asset_lifetime)
     
         amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)

@@ -127,13 +127,13 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         source_node_type = self.source_node_type_2
         source_node_location = self.source_node_location_2
         target_node_type = self.target_node_type_2
-        target_node_location = source_node_location
+        target_node_location = self.target_node_location_2
         
         source_node_time = 0
         target_node_time = year_number
         
         # Get the installed capacity in that year
-        installed_capacity = self.cumulative_new_installed[year_number]
+        # installed_capacity = self.cumulative_new_installed[year_number]
     
         # Create edge with balance = max_capacity - installed_capacity
         edge = Edge_STEVFNs()
@@ -149,14 +149,17 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                 self.network.extract_node(target_node_location, target_node_type, target_node_time)
             )
         # Define flow as max capacity minus actual installed capacity
-        max_capacity_param = self.conversion_fun_params_2["maximum_size"]
-        edge.flow = max_capacity_param[year_number] - installed_capacity
+        # max_capacity_param = self.conversion_fun_params_2["maximum_size"]
+        # edge.flow = max_capacity_param[year_number] - installed_capacity
+        edge.flow = self.flows
+        edge.conversion_fun = self.conversion_fun_2
+        edge.conversion_fun_params = self.conversion_fun_params_2
         
     def build_tech_potential_edges(self, year_number):
         source_node_type = "NULL"
         source_node_location = self.source_node_location_2
-        target_node_type = "RE_WIND_Tech"
-        target_node_location = source_node_location
+        target_node_type = "RE_PV_Tech"
+        target_node_location = self.target_node_location_2
         
         source_node_time = 0
         target_node_time = year_number
@@ -188,6 +191,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
             self.build_edge(hour)
         for year in range(self.num_years):
             self.build_max_capacity_edges(year)
+        for year in range(self.num_years):    
             self.build_tech_potential_edges(year)
         return
     
@@ -203,16 +207,6 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         '''
         Calculates total discounted and amortised cost scaled for representative timesteps.
         '''
-    
-        # Cost per year (learning curve)
-        # cost_array = np.array([
-        #     0.7060459581718788, 0.654075416391331, 0.6118892459369893, 0.5776453675998691, 0.5498485053888956,
-        #     0.5272848949886316, 0.5089692843969168, 0.4941019125600741, 0.48203358749592495, 0.4722373390489208,
-        #     0.464285408497092, 0.4578305702608631, 0.45259097012331034, 0.4483378179191948, 0.4448853972903205,
-        #     0.4420829562796257, 0.43980812466354835, 0.4379615705876078, 0.43646266318470744, 0.43524595178226116,
-        #     0.4342583079609333, 0.43345660567148603, 0.43280583811079215, 0.432277589129372, 0.43184879242361596,
-        #     0.4315007243321229, 0.431218186256034, 0.4309888410032783, 0.4308026740778189, 0.43065155639078273
-        # ])
         cost_array = self.cost_fun_params["sizing_constant"]
         asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
@@ -225,11 +219,9 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
     
         amortised_cost = cost_array * amort_factor  # shape (project_years,)
-    
         # Create index matrices for payment timing
         i, j = np.meshgrid(np.arange(project_years), np.arange(project_years), indexing='ij')
-        # discount_factor = (1 + discount_rate) ** (i - j) # This was discounting to year j, not year 0
-        discount_factor = (1 + discount_rate) ** i # This discounts to year 0
+        discount_factor = (1 + discount_rate) ** i # Discounting to year 0
         valid_mask = (i >= j) & (i < j + asset_lifetime)
     
         amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)
@@ -238,7 +230,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
         self.payments_M = cp.multiply(raw_payments, valid_mask)
         self.yearly_payments = cp.sum(self.payments_M, axis=1)
-    
+        
         return cp.sum(self.payments_M)
 
     
