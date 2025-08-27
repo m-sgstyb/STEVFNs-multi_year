@@ -17,6 +17,7 @@ from Code.Plotting import DPhil_Plotting
 from Code.Results import Results
 
 
+
 #### Define Input Files ####
 # sample_sizes = [51840, 69120, 131760]
 #sample_sizes = [4320, 8640, 17280, 69120]
@@ -25,8 +26,10 @@ sample_sizes = [4320]
 
 # case_study_name = "MEX_34560"
 # case_study_name = "three_countries_no_emissions_constraint4320"
-case_study_name = "two_country_Collab"
-# case_study_name = "MEX-CHL_Collab"
+# case_study_name = "two_country_Collab"
+# case_study_name = "SC_no_emissions_constraint"
+# case_study_name = "SC_no_emissions_constraint_capped_RE"
+case_study_name = "sc_testing_install_rates"
 
 for sample in sample_sizes:
     

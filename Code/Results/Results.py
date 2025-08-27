@@ -20,64 +20,82 @@ import pandas as pd
 import numpy as np
 
 
-def export_scenario_results(my_network, scenario_name):
+def export_scenario_results(my_network, scenario_name, simulation_factor=1.0):
     print("========= Exporting summary scenario results ========")
     num_years = my_network.assets[0].num_years
     years = list(range(1, num_years + 1))
-    print(f"Expected number of years: {num_years}")
+    # print(f"Expected number of years: {num_years}")
     discount_rate = float(my_network.system_parameters_df.loc["discount_rate", "value"])
     discount_factors = 1 / ((1 + discount_rate) ** np.arange(num_years))
-    # Initialize base dictionary
     data = {}
 
     def safe_assign(key, value):
         try:
             if hasattr(value, '__len__') and not isinstance(value, str):
                 val_len = len(value)
-                # print(f"Assigning '{key}' with length {val_len}")
                 if val_len != num_years:
                     print(f"  ❗ Length mismatch for '{key}': got {val_len}, expected {num_years}")
-            else:
-                print(f"Assigning '{key}' (non-list-like or scalar)")
             data[key] = value
         except Exception as e:
             print(f"❌ Error assigning '{key}': {e}")
             raise
 
+    # Base columns
     safe_assign("year", years)
     safe_assign("scenario", [scenario_name] * num_years)
+
+    # Placeholders for totals
     safe_assign("Annual_Emissions", [0] * num_years)
-    safe_assign("Peak_Annual_Demand", [0] * num_years)
     safe_assign("Total_Annual_Demand", [0] * num_years)
     safe_assign("Discounted_Annual_Demand", [0] * num_years)
-    safe_assign("Peak_Annual_Fossil_Gen_GWp", [0] * num_years)
+
     safe_assign("Total_Annual_Fossil_Gen_GWh", [0] * num_years)
     safe_assign("Discounted_Annual_Fossil_Gen_GWh", [0] * num_years)
-    safe_assign("Annual_NPV_OPEX_PP_BUSD", [0] * num_years)
+
+    # CAPEX + OPEX columns
+    capex_cols = []
+    opex_cols = []
 
     for asset in my_network.assets[1:]:
         name = asset.asset_name
         print(f"\nProcessing asset: {name}")
 
+        # Demand assets
         if hasattr(asset, "peak_demand"):
-            safe_assign("Peak_Annual_Demand", asset.peak_demand())
-            safe_assign("Total_Annual_Demand", asset.asset_size())
-            safe_assign("Discounted_Annual_Demand", asset.asset_size() * discount_factors)
+            total_annual_demand = [d * simulation_factor for d in asset.asset_size()]
+            safe_assign("Total_Annual_Demand", total_annual_demand)
+            discounted_demand = np.array(total_annual_demand) * discount_factors
+            safe_assign("Discounted_Annual_Demand", discounted_demand.tolist())
 
+        # Conventional generation (fossil, etc.)
         if hasattr(asset, "get_yearly_emissions"):
-            safe_assign("Annual_Emissions", asset.get_yearly_emissions())
-            safe_assign("Peak_Annual_Fossil_Gen_GWp", asset.peak_generation())
-            flows = asset.get_yearly_flows()[:num_years]
-            summed_flows = [sum(year) for year in flows]
-            safe_assign("Total_Annual_Fossil_Gen_GWh", summed_flows)
-            discounted_flows = summed_flows * discount_factors
-            safe_assign("Discounted_Annual_Fossil_Gen_GWh", discounted_flows.tolist())
-            safe_assign("Annual_NPV_OPEX_PP_BUSD", asset.get_yearly_usage_costs())
+            yearly_emissions = asset.get_yearly_emissions()
+            safe_assign("Annual_Emissions", yearly_emissions)
 
+            flows = asset.get_yearly_flows()[:num_years]
+            summed_flows = [(sum(year) * simulation_factor) for year in flows]
+            safe_assign("Total_Annual_Fossil_Gen_GWh", summed_flows)
+            discounted_flows = np.array(summed_flows) * discount_factors
+            safe_assign("Discounted_Annual_Fossil_Gen_GWh", discounted_flows.tolist())
+
+            opex_list = asset.get_yearly_usage_costs()
+            colname = f"{name}_annual_OPEX_BUSD"
+            safe_assign(colname, opex_list)
+            opex_cols.append(colname)
+
+        # RE capacity and generation
         if hasattr(asset, "cumulative_new_installed"):
-            flows = getattr(asset.flows, "value", asset.flows)
-            cumulative_installed = asset.cumulative_new_installed.value
-            existing_capacity_val = asset.conversion_fun_params["existing_capacity"].value
+            flows = np.array(getattr(asset.flows, "value", asset.flows), dtype=float)
+            cumulative_installed = np.array(asset.cumulative_new_installed.value, dtype=float)
+            existing_capacity_val = np.array(asset.conversion_fun_params["existing_capacity"].value, dtype=float)
+
+            safe_assign(f"{name}_new_annual_installed_GWp", flows.tolist())
+            safe_assign(f"{name}_total_capacity_GWp", (cumulative_installed + existing_capacity_val).tolist())
+
+            annual_gen = np.sum(asset.get_yearly_flows(), axis=1)
+            annual_gen = [g * simulation_factor for g in annual_gen]
+            safe_assign(f"{name}_annual_generation_GWh", annual_gen)
+            safe_assign(f"{name}_discounted_annual_gen_GWh", (np.array(annual_gen) * discount_factors).tolist())
 
             payments_M = getattr(asset, "payments_M", None)
             if payments_M is not None:
@@ -85,32 +103,62 @@ def export_scenario_results(my_network, scenario_name):
                 annual_payments = np.sum(payments, axis=1) if payments is not None else [0] * num_years
             else:
                 annual_payments = [0] * num_years
-
-            safe_assign(f"{name}_new_annual_installed_GWp", flows.tolist())
-            safe_assign(f"{name}_total_capacity_GWp", (cumulative_installed + existing_capacity_val).tolist())
-            safe_assign(f"{name}_annual_payments_BUSD", annual_payments)
-            annual_gen = np.sum(asset.get_yearly_flows(), axis=1)
-            safe_assign(f"{name}_annual_generation_GWh", annual_gen)
-            safe_assign(f"{name}_discounted_annual_gen_GWh", annual_gen * discount_factors)
+            colname = f"{name}_annual_CAPEX_BUSD"
+            safe_assign(colname, annual_payments)
+            capex_cols.append(colname)
 
     print("\n✅ All data lengths checked. Creating DataFrame...")
     time_series_df = pd.DataFrame(data)
 
-    # Cost summary
+    # Totals
+    total_capex = time_series_df[capex_cols].sum(axis=1) if capex_cols else 0
+    total_opex = time_series_df[opex_cols].sum(axis=1) if opex_cols else 0
+    total_demand = time_series_df["Discounted_Annual_Demand"]
+    gen_cols = [c for c in time_series_df.columns if "_discounted_annual_gen_GWh" in c or "Discounted_Annual_Fossil_Gen_GWh" in c]
+    total_gen = time_series_df[gen_cols].sum(axis=1) if gen_cols else 0
+
+    # LCOE & LCUE (USD/MWh → USD/kWh)
+    time_series_df["System_LCOE_USD_per_kWh"] = ((total_capex + total_opex) / total_gen) * 1000
+    time_series_df["System_LCUE_USD_per_kWh"] = ((total_capex + total_opex) / total_demand) * 1000
+
+    # ===========================
+    # SUMMARY DF PER ASSET
+    # ===========================
     system_cost = my_network.problem.value
     cost_summary = []
     for asset in my_network.assets[1:]:
-        cost_val = getattr(asset.cost, "value", asset.cost)
+        if hasattr(asset, "get_yearly_payments"):
+            capex_list = asset.get_yearly_payments()
+        else:
+            payments_M = getattr(asset, "payments_M", None)
+            if payments_M is not None:
+                payments = getattr(payments_M, "value", payments_M)
+                capex_list = np.sum(payments, axis=1) if payments is not None else [0] * num_years
+            else:
+                capex_list = [0] * num_years
+        opex_list = asset.get_yearly_usage_costs() if hasattr(asset, "get_yearly_usage_costs") else [0] * num_years
+
+        total_capex_asset = sum(capex_list)
+        total_opex_asset = sum(opex_list)
+        total_cost_asset = total_capex_asset + total_opex_asset
+
+        emissions_list = asset.get_yearly_emissions() if hasattr(asset, "get_yearly_emissions") else [0] * num_years
+        total_emissions_asset = sum(emissions_list)
+
         cost_summary.append({
             "scenario": scenario_name,
-            "total_system_cost": system_cost,
             "asset_name": asset.asset_name,
-            "asset_cost": cost_val,
+            "total_system_cost_BUSD": system_cost,
+            "total_capex_BUSD": total_capex_asset,
+            "total_opex_BUSD": total_opex_asset,
+            "total_cost_BUSD": total_cost_asset,
+            "total_emissions_MtCO2e": total_emissions_asset
         })
 
     summary_df = pd.DataFrame(cost_summary)
 
     return time_series_df, summary_df
+
 
 
 def export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor):
@@ -282,434 +330,16 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
         cost_summary.append({
             "scenario": scenario_name,
             "asset_name": asset.asset_name,
-            "total_system_cost": system_cost,
+            "total_system_cost_BUSD": system_cost,
             "total_capex_BUSD": total_capex_asset,
             "total_opex_BUSD": total_opex_asset,
             "total_cost_BUSD": total_cost_asset,
-            "total_emissions_tonnes": total_emissions_asset
+            "total_emissions_MtCO2e": total_emissions_asset
         })
 
     summary_df = pd.DataFrame(cost_summary)
 
     return time_series_df, summary_df
-
-def get_total_data(my_network, location_parameters_df, asset_parameters_df):
-    '''
-    This function exports data for the case study being run for assets per location
-    including asset size, asset cost and the country(ies) total emissions per scenario
-    
-    It needs to be run within the scenario loop and concatenated to another dataframe
-    to export all results in a case study together.
-    
-    Parameters
-    ----------
-    my_network : STEVFNs Network
-        Network object created based on the assets in a network structure, timesteps
-        and other parameters defined in STEVFNs.
-    location_parameters_df : DataFrame
-        Obtained by reading Location_Parameters.csv file in a case study, coded in main.
-    asset_parameters_df : DataFrame
-        Obtained by reading Asset_Parameters.csv file in a case study, coded in main.
-    
-    Returns
-    -------
-    total_data_df : DataFrame
-        Results compiled for sets of countries in a case study (either autarky or
-        collaboration) for size, cost, and emissions. Does NOT round values
-    '''
-    location_names = list(location_parameters_df["location_name"])
-    loc_names_set_list = list(set(asset_parameters_df["Location_1"]).union(set(asset_parameters_df["Location_2"])))
-    loc_names_list = ["",]*3
-    for counter1 in range(len(loc_names_set_list)):
-        loc_names_list[counter1] = location_names[loc_names_set_list[counter1]]
-    
-    total_data_columns = ["country_1",
-                  "country_2",
-                  "country_3",
-                  "collaboration_emissions",
-                  "technology_cost",
-                  "technology_name",]
-    total_data_df = pd.DataFrame(columns = total_data_columns)
-    
-    collaboration_emissions =  my_network.assets[0].asset_size() # this is now a list of self.num_years elements
-    loc_names_set = set()
-    
-    # Define asset types to distinguish formatting
-    storage_assets = ['BESS', 'NH3_Storage']
-    renewable_assets = ['RE_PV_Rooftop_Lim', 'RE_PV_Openfield_Lim', 'RE_WIND_Onshore_Lim',
-                        'RE_WIND_Offshore_Lim', 'RE_WIND_Onshore_Existing', 'RE_PV_Openfield_Exising']
-    demand_assets = ['EL_Demand', 'HTH_Demand']
-    transport_assets= ['EL_Transport', 'NH3_Transport']
-    
-    for counter1 in range(1,len(my_network.assets)):
-        asset = my_network.assets[counter1]
-        name = asset.asset_name
-        
-        ### Exceptions in formatting or extracting results per type of asset ###
-        if name in storage_assets:
-            loc1 = asset.asset_structure["Location_1"]
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-            
-        elif name in renewable_assets:
-            loc1 = asset.target_node_location
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost =  asset.cost.value
-            technology_size = asset.asset_size() # this is now a list of self.num_years elements
-
-        elif name in demand_assets:
-            loc1 = asset.node_location
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-            
-        elif name in transport_assets:
-            loc1 = asset.asset_structure["Location_1"]
-            loc2 = asset.asset_structure["Location_2"]
-            loc_name_1 = location_names[loc1]
-            loc_name_2 = location_names[loc2]
-            loc_names_set.add(loc_name_1)
-            loc_names_set.add(loc_name_1)
-            technology_name = name + r"_[" + loc_name_1 + r"-" + loc_name_2 + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-        
-        ### The rest of the assets, in general ###
-        else:
-            loc1 = asset.asset_structure["Location_1"]
-            loc_name = location_names[loc1]
-            loc_names_set.add(loc_name)
-            technology_name = name + r"_[" + loc_name + r"]"
-            technology_cost = asset.cost.value
-            technology_size = asset.asset_size()
-        
-        N = np.ceil(my_network.system_parameters_df.loc["project_life", "value"]/8760) #number of years for the project
-        t_df = pd.DataFrame({"country_1": [loc_names_list[0]],
-                             "country_2": [loc_names_list[1]],
-                             "country_3": [loc_names_list[2]],
-                             "country_4": [loc_names_list[3]],
-                             "collaboration_emissions_MtCO2e/y": [collaboration_emissions/N],# Number is annualized, number is converted from ktCO2e to MtCO2e
-                             "technology_cost_G$/y": [technology_cost/N],# Number is annualized
-                             "technology_size": [technology_size],
-                             "technology_name": [technology_name],
-            })
-        total_data_df = pd.concat([total_data_df, t_df], ignore_index=True)
-    return total_data_df
-
-def export_aut_flows(my_network):
-    '''
-    This function exports the flows of the network in autarky, (single-country)
-    case studies. 
-    
-    Parameters
-    ----------
-    my_network : STEVFNs network
-        Full network after running a given system
-
-    Returns
-    -------
-    Dataframe of flows for Autarky Case Study
-    '''
-    # Initialize an empty list to hold DataFrames for each asset
-    data_frames = []
-
-    # Iterate over each asset and collect flow data
-    for i in range(1, len(my_network.assets)):
-        asset = my_network.assets[i]
-        name = asset.asset_name
-        
-        if name == 'EL_Demand_UM':
-            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value
-            df = pd.DataFrame({"Net_demand": demand_data})
-            data_frames.append(df)
-        
-        elif name == 'EL_Demand':
-            demand_data = asset.flows.value
-            df = pd.DataFrame({"Net_demand": demand_data})
-            data_frames.append(df)
-        
-        elif name == 'BESS':
-            BESS_ch = asset.assets_dictionary['Charging'].flows.value
-            BESS_disch = asset.assets_dictionary['Discharging'].flows.value
-            df = pd.DataFrame({"BESS_Charging": BESS_ch, "BESS_Discharging": BESS_disch})
-            data_frames.append(df)
-        
-        elif name in ['PP_CO2', 'PP_CO2_Existing']:
-            pp_data = asset.flows.value
-            df = pd.DataFrame({"PP_total": pp_data})
-            data_frames.append(df)
-        
-        elif name in ['RE_PV_Existing', 'RE_PV_Openfield_Lim']:
-            pv_data = asset.get_plot_data()
-            df = pd.DataFrame({"PV_total": pv_data})
-            data_frames.append(df)
-        
-        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
-            wind_data = asset.get_plot_data()
-            df = pd.DataFrame({"Wind_total": wind_data})
-            data_frames.append(df)
-
-    flows_df = pd.concat(data_frames, axis=1)
-    
-    return flows_df
-    
-def export_collab_flows(my_network, location_parameters_df):
-    '''
-    This function exports the flows of the network in autarky and collaboration
-    forms for multiple country configuration case studies.
-    
-    Parameters
-    ----------
-    my_network : STEVFNs network
-        Full network after running a given system
-    location_parameters_df : DataFrame
-        From Location_Parameters.csv in a scenario folder
-    Returns
-    -------
-    Dataframe of flows for Collab Case Studies
-    '''
-    # Extract timesteps being run
-    timesteps = my_network.system_structure_properties["simulated_timesteps"]
-
-    # Initialize an empty list to hold individual DataFrames for each asset and location
-    data_frames = []
-
-    # Extract hourly arrays of flows for each asset
-    for i in range(1, len(my_network.assets)):
-        asset = my_network.assets[i]
-        name = asset.asset_name
-        
-        loc1 = asset.node_location if 'node_location' in dir(asset) \
-            else asset.asset_structure.get("Location_1")
-        if loc1 not in location_parameters_df.index:
-            continue  # Skip if the location is not in the location parameters DataFrame
-
-        loc_name = location_parameters_df.loc[loc1, "location_name"]
-
-        if name == 'EL_Demand_UM' or name == 'EL_Demand':
-            demand_name = f"{name}_[{loc_name}]"
-            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value \
-                if name == 'EL_Demand_UM' else asset.flows.value
-            df = pd.DataFrame({demand_name: demand_data})
-            data_frames.append(df)
-
-        elif name == 'BESS':
-            bess_ch_name = f"{name}ch_[{loc_name}]"
-            bess_disch_name = f"{name}disch_[{loc_name}]"
-            BESS_ch = asset.assets_dictionary['Charging'].flows.value
-            BESS_disch = asset.assets_dictionary['Discharging'].flows.value
-            df = pd.DataFrame({bess_ch_name: BESS_ch, bess_disch_name: BESS_disch})
-            data_frames.append(df)
-
-        elif name in ['PP_CO2', 'PP_CO2_Existing']:
-            pp_name = f"{name}_[{loc_name}]"
-            pp_data = asset.flows.value
-            df = pd.DataFrame({pp_name: pp_data})
-            data_frames.append(df)
-
-        elif name in ['RE_PV_Exiting', 'RE_PV_Openfield_Lim']:
-            pv_name = f"{name}_[{loc_name}]"
-            pv_data = asset.get_plot_data()
-            df = pd.DataFrame({pv_name: pv_data})
-            data_frames.append(df)
-
-        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
-            wind_name = f"{name}_[{loc_name}]"
-            wind_data = asset.get_plot_data()
-            df = pd.DataFrame({wind_name: wind_data})
-            data_frames.append(df)
-
-        elif name == 'EL_Transport':
-            loc2 = asset.asset_structure["Location_2"]
-            loc_name_2 = location_parameters_df.loc[loc2, "location_name"]
-            transport_out_name = f"{name}_[{loc_name}-{loc_name_2}]"
-            transport_in_name = f"{name}_[{loc_name_2}-{loc_name}]"
-            HVDC_out = asset.flows.value[:timesteps]
-            HVDC_in = asset.flows.value[timesteps:(2*timesteps)]
-            df = pd.DataFrame({transport_out_name: HVDC_out, transport_in_name: HVDC_in})
-            data_frames.append(df)
-
-    # Concatenate all data frames along columns to form a single output DataFrame
-    flows_df = pd.concat(data_frames, axis=1)
-
-    return flows_df
-
-def calculate_curtailment_aut(my_network):
-    '''
-    Parameters
-    ----------
-    my_network : STEVFNs network
-        Full network after running a given system
-
-    Returns
-    -------
-    DataFrame
-        Dataframe of curtailment data, hourly
-    '''
-    # Extract timesteps in network structure
-    timesteps = my_network.system_structure_properties["simulated_timesteps"]
-
-    total_generation = np.zeros(timesteps)
-    total_demand = np.zeros(timesteps)
-    total_outflows = np.zeros(timesteps)
-    total_storage_discharge = np.zeros(timesteps)
-    pv_generation = np.zeros(timesteps)
-    wind_generation = np.zeros(timesteps)
-
-    for i in range(1, len(my_network.assets)):
-        asset = my_network.assets[i]
-        name = asset.asset_name
-
-        if name in ['RE_PV_Exiting', 'RE_PV_Openfield_Lim']:
-            pv_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            pv_generation += pv_data
-            total_generation += pv_data
-
-        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
-            wind_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            wind_generation += wind_data
-            total_generation += wind_data
-
-        elif name in ['PP_CO2', 'PP_CO2_Existing']:
-            generation_data = asset.flows.value
-            total_generation += generation_data
-
-        elif name == 'EL_Demand_UM' or name == 'EL_Demand':
-            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value if name == 'EL_Demand_UM' else asset.flows.value
-            total_demand += demand_data
-
-        elif name == 'BESS':
-            BESS_charging = asset.assets_dictionary['Charging'].flows.value
-            BESS_discharging = asset.assets_dictionary['Discharging'].flows.value
-            total_outflows += BESS_charging
-            total_storage_discharge += BESS_discharging
-
-    # Calculate curtailment as the excess generation at each hour
-    curtailment = (total_generation + total_storage_discharge) - (total_demand + total_outflows)
-    curtailment[curtailment < 0] = 0  # Ensure curtailment is non-negative
-
-    # Determine curtailment contributions from PV and Wind, assuming PV is curtailed first
-    pv_curtailment = np.minimum(curtailment, pv_generation)
-    wind_curtailment = np.minimum(curtailment - pv_curtailment, wind_generation)
-
-    # Create a DataFrame for curtailment
-    curtailment_df = pd.DataFrame({
-        "Total_Curtailment": curtailment,
-        "PV_Curtailment": pv_curtailment,
-        "Wind_Curtailment": wind_curtailment
-    })
-
-    return curtailment_df
-
-def calculate_curtailment_collab(my_network, location_parameters_df):
-    '''
-    Parameters
-    ----------
-    my_network : STEVFNs network
-        Full network after running a given system in collaboration.
-    location_parameters_df : DataFrame
-        A DataFrame with location parameters, indexed by location IDs.
-
-    Returns
-    -------
-    DataFrame
-        Dataframe of curtailment data by location, hourly.
-    '''
-    # Extract timesteps in network structure
-    timesteps = my_network.system_structure_properties["simulated_timesteps"]
-    
-    # Initialize dictionaries to store results for each location
-    curtailment_data = {}
-    
-    # Process assets by location
-    for i in range(1, len(my_network.assets)):
-        asset = my_network.assets[i]
-        name = asset.asset_name
-
-        # Determine the location of the asset
-        loc1 = asset.node_location if 'node_location' in dir(asset) \
-            else asset.asset_structure.get("Location_1")
-        if loc1 not in location_parameters_df.index:
-            continue  # Skip if the location is not in the location parameters DataFrame
-
-        loc_name = location_parameters_df.loc[loc1, "location_name"]
-
-        # Initialize location-specific data structure if not already present
-        if loc_name not in curtailment_data:
-            curtailment_data[loc_name] = {
-                "Total_Generation": np.zeros(timesteps),
-                "Total_Demand": np.zeros(timesteps),
-                "Total_Outflows": np.zeros(timesteps),
-                "Total_Storage_Discharge": np.zeros(timesteps),
-                "PV_Generation": np.zeros(timesteps),
-                "Wind_Generation": np.zeros(timesteps),
-                "HVDC_In": np.zeros(timesteps),
-            }
-
-        # Fetch generation or consumption data
-        if name in ['RE_PV_Exiting', 'RE_PV_Openfield_Lim']:
-            pv_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            curtailment_data[loc_name]["PV_Generation"] += pv_data
-            curtailment_data[loc_name]["Total_Generation"] += pv_data
-
-        elif name in ['RE_Wind_Existing', 'RE_WIND_Onshore_Lim']:
-            wind_data = asset.get_plot_data() if 'get_plot_data' in dir(asset) else asset.flows.value
-            curtailment_data[loc_name]["Wind_Generation"] += wind_data
-            curtailment_data[loc_name]["Total_Generation"] += wind_data
-
-        elif name in ['PP_CO2', 'PP_CO2_Existing']:
-            generation_data = asset.flows.value
-            curtailment_data[loc_name]["Total_Generation"] += generation_data
-
-        elif name == 'EL_Demand_UM' or name == 'EL_Demand':
-            demand_data = asset.assets_dictionary['Net_EL_Demand'].flows.value if name == 'EL_Demand_UM' else asset.flows.value
-            curtailment_data[loc_name]["Total_Demand"] += demand_data
-
-        elif name == 'BESS':
-            BESS_charging = asset.assets_dictionary['Charging'].flows.value
-            BESS_discharging = asset.assets_dictionary['Discharging'].flows.value
-            curtailment_data[loc_name]["Total_Outflows"] += BESS_charging
-            curtailment_data[loc_name]["Total_Storage_Discharge"] += BESS_discharging
-
-        elif name == 'EL_Transport':
-            HVDC_out = asset.flows.value[:timesteps]
-            HVDC_in = asset.flows.value[timesteps:timesteps*2]
-            curtailment_data[loc_name]["Total_Outflows"] += HVDC_out
-            curtailment_data[loc_name]["HVDC_In"] += HVDC_in
-
-    # Calculate curtailment for each location
-    results = []
-    for loc_name, data in curtailment_data.items():
-        # Calculate curtailment as excess generation
-        curtailment = (data["Total_Generation"] + data["Total_Storage_Discharge"] + data["HVDC_In"]) - \
-                      (data["Total_Demand"] + data["Total_Outflows"])
-        curtailment[curtailment < 0] = 0  # Ensure non-negative curtailment
-
-        # Determine curtailment contributions from PV and Wind
-        pv_curtailment = np.minimum(curtailment, data["PV_Generation"])
-        wind_curtailment = np.minimum(curtailment - pv_curtailment, data["Wind_Generation"])
-
-        # Store results in a structured format
-        results.append(pd.DataFrame({
-            "Location": loc_name,
-            "Hour": np.arange(timesteps),
-            "Total_Curtailment": curtailment,
-            "PV_Curtailment": pv_curtailment,
-            "Wind_Curtailment": wind_curtailment
-        }))
-
-    # Combine results into a single DataFrame
-    curtailment_df = pd.concat(results, ignore_index=True)
-
-    return curtailment_df
-
 
 def save_yearly_flows_to_csv(network, output_path):
     """
@@ -848,13 +478,12 @@ def get_lcoe_per_year(network, output_path=None):
 
             if asset.asset_name != "EL_Demand_MY":
                 generation_per_year = np.sum(asset.get_yearly_flows()[:30], axis=1)
-                # sampled_days = int((asset.number_of_edges / 24) / asset.num_years)
-                # simulation_factor = 365 / sampled_days
-                # generation_per_year *= simulation_factor
+                sampled_days = int((asset.number_of_edges / 24) / asset.num_years)
+                simulation_factor = 365 / sampled_days
+                generation_per_year *= simulation_factor
 
                 discounted_generation = generation_per_year * discount_factors
                 total_discounted_energy += discounted_generation
-
                 total_gen_energy += generation_per_year
             else:
                 demand_per_year = np.sum(asset.get_yearly_flows()[:30], axis=1)
@@ -917,7 +546,9 @@ def get_grid_intensity(network, output_path=None):
                 emissions_per_year = asset.get_yearly_emissions()[:30]
                 
             total_gen_energy += generation_per_year
-            grid_intensity_per_year = emissions_per_year / total_gen_energy #MtCO2/GWh
+            grid_intensity_per_year = np.divide(emissions_per_year, total_gen_energy,
+                                                out=np.zeros_like(generation_per_year),
+                                                where=total_gen_energy != 0) # MtCO2/GWh = ktCO2e/MWh
         except Exception as e:
             print(f"[Skip] {asset.asset_name}: {e}")
             continue

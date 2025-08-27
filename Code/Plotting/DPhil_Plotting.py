@@ -873,6 +873,5 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
         plt.close(fig)  # prevent memory leaks in large runs
 
         print(f"✅ Saved  installed pathways plot for location {loc}")
-
     
     
