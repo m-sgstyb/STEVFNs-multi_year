@@ -159,6 +159,31 @@ def export_scenario_results(my_network, scenario_name, simulation_factor=1.0):
 
     return time_series_df, summary_df
 
+def calculate_curtailment(time_series_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate curtailment per year from the exported time_series_df.
+    Curtailment occurs when total generation > total demand.
+    
+    Returns:
+        pd.DataFrame with columns: ["year", "total_fossil_gen", "total_curtailment"]
+    """
+    results = pd.DataFrame()
+    results["year"] = time_series_df["year"]
+
+    # Fossil generation (undiscounted to keep physical balance in GWh terms)
+    results["total_fossil_gen"] = time_series_df["Total_Annual_Fossil_Gen_GWh"]
+
+    # Identify generation columns (exclude fossil discounted gen since already counted above)
+    gen_cols = [c for c in time_series_df.columns if c.endswith("_annual_generation_GWh")]
+
+    # Total generation = PV + Wind + PP + Fossil (all annual, not discounted)
+    total_gen = time_series_df[gen_cols].sum(axis=1) + time_series_df["Total_Annual_Fossil_Gen_GWh"]
+
+    # Curtailment = max(0, total_gen - demand)
+    demand = time_series_df["Total_Annual_Demand"]
+    results["total_curtailment"] = (total_gen - demand).clip(lower=0)
+
+    return results
 
 
 def export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor):

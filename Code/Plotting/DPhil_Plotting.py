@@ -468,8 +468,163 @@ def plot_yearly_flows_stacked(network, output_folder):
         plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"))
         plt.close()
 
-    
     print(f"[✓] Stacked plots saved to: {output_folder}")
+    
+def plot_seasonal_mean_daily_flows_stacked(network, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
+
+    tech_order = ["pp", "wind", "pv"]
+    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    demand_color = "red"
+
+    seasons = ["Winter", "Spring", "Summer", "Autumn"]
+
+    tech_flows_by_year = {tech: [] for tech in tech_order}
+    demand_by_year = []
+
+    # --- Collect profiles ---
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flows"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception:
+            continue
+
+        name = asset.asset_name.lower()
+        if "demand" in name:
+            demand_by_year = yearly_chunks
+        else:
+            for tech in tech_order:
+                if tech in name:
+                    tech_flows_by_year[tech].append(yearly_chunks)
+                    break
+
+    num_years = len(demand_by_year)
+    for year in range(num_years):
+        demand = np.array(demand_by_year[year])
+        n_hours = demand.shape[0]
+
+        if n_hours % 24 != 0:
+            print(f"⚠️ Year {year+1} does not divide evenly into 24h days ({n_hours} hours). Skipping.")
+            continue
+
+        n_days = n_hours // 24
+
+        # split days equally into 4 seasons
+        days_per_season = n_days // 4
+        season_indices = {
+            "Winter": np.arange(0, days_per_season),
+            "Spring": np.arange(days_per_season, 2 * days_per_season),
+            "Summer": np.arange(2 * days_per_season, 3 * days_per_season),
+            "Autumn": np.arange(3 * days_per_season, n_days),
+        }
+
+        demand_daily = demand.reshape(n_days, 24)
+
+        # concat 4 seasons sequentially
+        demand_concat = []
+        tech_concat = {tech: [] for tech in tech_order}
+
+        for season in seasons:
+            if len(season_indices[season]) == 0:
+                continue
+            # mean daily demand for season
+            demand_mean_day = demand_daily[season_indices[season]].mean(axis=0)
+            demand_concat.append(demand_mean_day)
+
+            # mean daily flows for each tech
+            for tech in tech_order:
+                flows_list = tech_flows_by_year[tech]
+                tech_total = np.zeros(24)
+
+                for flows in flows_list:
+                    if year < len(flows):
+                        flow_year = np.array(flows[year])
+                        if flow_year.shape != demand.shape:
+                            print(f"⚠️ Flow shape mismatch in year {year+1} for tech {tech}")
+                            continue
+
+                        flow_daily = flow_year.reshape(n_days, 24)
+                        tech_mean_day = flow_daily[season_indices[season]].mean(axis=0)
+                        tech_total += tech_mean_day
+
+                tech_concat[tech].append(tech_total)
+
+        # stack them side by side → axis length = 24 * num_seasons
+        if len(demand_concat) == 0:
+            print(f"[⚠️] No demand data found for {network.scenario_name}, skipping seasonal plot.")
+            plt.close()
+            return
+        else:
+            demand_concat = np.concatenate(demand_concat, axis=0)
+        for tech in tech_order:
+            tech_concat[tech] = np.concatenate(tech_concat[tech], axis=0)
+
+        x = np.arange(len(demand_concat))  # 96 if 4 seasons
+
+        remaining_demand = demand_concat.copy()
+        bottom = np.zeros_like(demand_concat)
+
+        plt.figure(figsize=(14, 6))
+
+        for tech in tech_order:
+            tech_total = tech_concat[tech]
+
+            used = np.minimum(tech_total, remaining_demand)
+            excess = tech_total - used
+
+            plt.fill_between(x, bottom, bottom + used,
+                             color=tech_colors[tech],
+                             label=tech.capitalize(),
+                             alpha=1.0,
+                             edgecolor='none')
+
+            plt.fill_between(x, bottom + used, bottom + used + excess,
+                             color=tech_colors[tech],
+                             alpha=0.3,
+                             edgecolor=tech_colors[tech])
+
+            bottom += tech_total
+            remaining_demand -= used
+            remaining_demand = np.clip(remaining_demand, 0, None)
+
+        # Demand line
+        plt.plot(x, demand_concat, color=demand_color, label="Demand",
+                 linestyle="--", linewidth=1.5)
+        # axis limits for consistent label placement
+        y_max = max(demand_concat.max(), bottom.max())
+        label_height = y_max * 1.05
+        # vertical season dividers + labels
+        for i in range(1, len(seasons)):
+            plt.axvline(i*24, color="grey", linestyle="--", linewidth=1)
+            plt.text(i*24 - 12, 1.02, seasons[i-1],
+                     ha="center", va="bottom", fontsize=10,
+                     transform=plt.gca().get_xaxis_transform())
+        # last season label
+        plt.text((len(seasons)-0.5)*24, 1.02, seasons[-1],
+                 ha="center", va="bottom", fontsize=10,
+                 transform=plt.gca().get_xaxis_transform())
+        
+        # custom x-ticks: 0–23 repeated per season
+        xticks = np.arange(0, 24*len(seasons), 6)  # tick every 6h
+        xtick_labels = [t % 24 for t in xticks]   # wrap every 24h
+        plt.xticks(xticks, xtick_labels)
+        
+        # start axes at origin
+        plt.xlim(0, 24*len(seasons))
+        plt.ylim(0, label_height * 1.1)
+
+        # plt.title(f"Seasonal Mean Daily Stacked Generation vs Demand – Year {year+1}")
+        plt.xlabel("Hour of mean day of Season")
+        plt.ylabel("Power Flow")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_folder, f"seasonal_mean_day_year_{year+1}.png"))
+        plt.close()
+
+    print(f"[✓] Seasonal mean daily plots saved to: {output_folder}")
 
 def plot_yearly_flows_stacked_by_location(network, case_study_name, location_parameters_df,
                                           output_folder):
@@ -874,4 +1029,14 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
 
         print(f"✅ Saved  installed pathways plot for location {loc}")
     
-    
+def plot_fossil_vs_curtailment(curtailment_df: pd.DataFrame, save_path):
+    plt.figure(figsize=(10, 6))
+    plt.plot(curtailment_df["year"], curtailment_df["total_fossil_gen"], marker="o", label="Fossil Generation (GWh)")
+    plt.plot(curtailment_df["year"], curtailment_df["total_curtailment"], marker="x", label="Curtailment (GWh)")
+    plt.xlabel("Year")
+    plt.ylabel("GWh")
+    plt.title("Fossil Generation vs Curtailment")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(save_path, "fossil_vs_curtailment.png"))
+    plt.show()

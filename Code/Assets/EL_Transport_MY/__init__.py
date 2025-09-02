@@ -111,7 +111,9 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         self.edges = []
         for counter1 in range(self.number_of_edges):
             self.build_edge(counter1)
-            self.build_edge_opposite(counter1)
+        # Build opposite edge once all initial ones are created to follow set of values in self.flows
+        for counter2 in range(self.number_of_edges):
+            self.build_edge_opposite(counter2)
         return
     
     def _get_amortised_sizing_cost(self):

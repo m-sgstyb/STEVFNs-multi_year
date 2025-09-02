@@ -22,19 +22,20 @@ from Code.Results import Results
 # sample_sizes = [51840, 69120, 131760]
 #sample_sizes = [4320, 8640, 17280, 69120]
 # sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
-sample_sizes = [4320]
+sample_sizes = [8640, 17280, 34560, 69120, 131760, 138240, 200160]
 
 # case_study_name = "MEX_34560"
 # case_study_name = "three_countries_no_emissions_constraint4320"
 # case_study_name = "two_country_Collab"
 # case_study_name = "SC_no_emissions_constraint"
 # case_study_name = "SC_no_emissions_constraint_capped_RE"
-case_study_name = "sc_testing_install_rates"
+# case_study_name = "sc_pathways_med_RE"
+# case_study_name = "emissions_Baselines"
 
 for sample in sample_sizes:
     
     
-    # case_study_name = f"MEX_30y_MY_{sample}"
+    case_study_name = f"MEX_{sample}"
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
     case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
@@ -161,9 +162,11 @@ for sample in sample_sizes:
                 Results.save_yearly_flows_to_csv(my_network, yearly_path)
                 # DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
                 DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
+                DPhil_Plotting.plot_seasonal_mean_daily_flows_stacked(my_network, results_folder)
                 DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
         
                 time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
+                curtailment = Results.calculate_curtailment(time_series_df)
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
                 summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
         
@@ -171,7 +174,8 @@ for sample in sample_sizes:
                 save_path_gef = os.path.join(results_folder, "gef_per_year.csv")
                 lcoe = Results.get_lcoe_per_year(my_network, save_path_lcoe)
                 grid_emissions_factor = Results.get_grid_intensity(my_network, save_path_gef)
-            
+                
+                DPhil_Plotting.plot_fossil_vs_curtailment(curtailment, results_folder)
                 emissions_df = pd.DataFrame(emissions_dict)
                 # Save to CSV
                 emissions_df.to_csv(os.path.join(scenario_folder, "all_scenarios_emissions.csv"), index=False)
