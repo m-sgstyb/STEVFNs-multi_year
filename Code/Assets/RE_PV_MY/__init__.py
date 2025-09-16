@@ -45,9 +45,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                                                                 name=f"cost_learning_curve_{self.asset_name}")}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(nonneg=True,
                                                                         name=f"existing_capacity_{self.asset_name}")}
-        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True,
-                                                                name=f"max_size_{self.asset_name}"),
-                                        "baseline_country_supply": cp.Parameter(nonneg=True,
+        self.conversion_fun_params_2 = {"baseline_country_supply": cp.Parameter(nonneg=True,
                                                                                name=f"baseline_country_supply{self.asset_name}"), 
                                         "country_supply_growth": cp.Parameter(nonneg=True,
                                                                                name=f"country_supply_growth{self.asset_name}"),
@@ -86,9 +84,7 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
                                                                 name=f"cost_learning_curve_{self.asset_name}")}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True, name=f"existing_cap_{self.asset_name}"),}
-        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(shape=(30,), nonneg=True,
-                                                                name=f"max_size_{self.asset_name}"),
-                                        "baseline_country_supply": cp.Parameter(shape=(), nonneg=True,
+        self.conversion_fun_params_2 = {"baseline_country_supply": cp.Parameter(shape=(), nonneg=True,
                                                                                name=f"baseline_country_supply{self.asset_name}"), 
                                         "country_supply_growth": cp.Parameter(shape=(), nonneg=True,
                                                                                name=f"country_supply_growth{self.asset_name}"),
@@ -399,8 +395,8 @@ class RE_PV_MY_Asset(Asset_STEVFNs):
         discount_factor = (1 + discount_rate) ** i # Discounting to year 0
         valid_mask = (i >= j) & (i < j + asset_lifetime)
     
-        amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)
-        flows_j = cp.reshape(self.flows, (1, project_years))  # shape (1, years)
+        amortised_j = cp.reshape(amortised_cost, (1, project_years), order="F")  # shape (1, years)
+        flows_j = cp.reshape(self.flows, (1, project_years), order="F")  # shape (1, years)
     
         raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
         self.payments_M = cp.multiply(raw_payments, valid_mask)
