@@ -19,23 +19,15 @@ from Code.Results import Results
 
 
 #### Define Input Files ####
-# sample_sizes = [51840, 69120, 131760]
-#sample_sizes = [4320, 8640, 17280, 69120]
-# sample_sizes = [51840, 69120] # Need emissions from each scenario to compare
-sample_sizes = [8640, 17280, 34560, 69120, 131760, 138240, 200160]
-
-# case_study_name = "MEX_34560"
-# case_study_name = "three_countries_no_emissions_constraint4320"
-# case_study_name = "two_country_Collab"
-# case_study_name = "SC_no_emissions_constraint"
-# case_study_name = "SC_no_emissions_constraint_capped_RE"
-# case_study_name = "sc_pathways_med_RE"
-# case_study_name = "emissions_Baselines"
+sample_sizes = [8640]
+# sample_sizes = ["Collab"]
+case_study_name = "sc_pathways_med_RE"
+# case_study_name = "two_country_emission_baseline_Collab"
 
 for sample in sample_sizes:
-    
-    
-    case_study_name = f"MEX_{sample}"
+    # case_study_name = f"MEX_{sample}"
+    # case_study_name = f"two_country_baseline_emissions_global_{sample}_Collab"
+    # case_study_name = f"emissions_Baselines_{sample}"
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
     case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
@@ -137,23 +129,15 @@ for sample in sample_sizes:
               
             yearly_path = os.path.join(case_study_folder, f"all_flows_yearly_{scenario_name}.csv")
 
-            if case_study_name.endswith("_Autarky"):
+            if case_study_name.endswith("_Autarky") or case_study_name.endswith("_Collab"):
+                Results.save_yearly_flows_to_csv_multiloc(my_network, location_parameters_df, yearly_path)
                 DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name, 
                                                                      location_parameters_df, results_folder)
                 DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY",
                                                                         results_folder,
                                                              tech_name_1="PV", tech_name_2="Wind")
-                time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
-                                                                                           scenario_name, simulation_factor)
-                time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
-                summary_df.to_csv(os.path.join(results_folder, "summary_df.csv"))
-            elif case_study_name.endswith("_Collab"):
-                Results.save_yearly_flows_to_csv_multiloc(my_network, location_parameters_df, yearly_path)
-                DPhil_Plotting.plot_yearly_flows_stacked_by_location(my_network, case_study_name,
-                                                                     location_parameters_df, results_folder)
-                DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY",
-                                                                        results_folder,
-                                                             tech_name_1="PV", tech_name_2="Wind")
+                DPhil_Plotting.plot_seasonal_mean_daily_flows_by_location(my_network, case_study_name,
+                                               location_parameters_df, results_folder)
                 time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
                                                                                            scenario_name, simulation_factor)
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
