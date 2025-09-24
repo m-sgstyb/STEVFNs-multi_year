@@ -17,6 +17,15 @@ from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
 from Code.Results import get_new_input_params
 
+
+plt.rcParams.update({
+    "axes.labelsize": 14,   # axis label size
+    "xtick.labelsize": 12,  # x tick size
+    "ytick.labelsize": 12,  # y tick size
+    "legend.fontsize": 12,  # legend label size
+    "legend.title_fontsize": 13,
+})
+
 def logistic_curve(t, K, r, t0):
     '''
     
@@ -1182,8 +1191,8 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
 def plot_fossil_vs_curtailment(curtailment_df: pd.DataFrame, save_path):
     years = np.arange(2025,2055)
     plt.figure(figsize=(10, 6))
-    plt.plot(years, curtailment_df["total_fossil_gen"]/1000, marker="o", label="Fossil Generation")
-    plt.plot(years, curtailment_df["total_curtailment"]/1000, marker="x", label="Curtailment")
+    plt.plot(years, curtailment_df["total_fossil_gen"]/1000, label="Fossil Generation")
+    plt.plot(years, curtailment_df["total_curtailment"]/1000, label="Curtailment")
     plt.xlabel("Year")
     plt.ylabel("Total energy (TWh)")
     plt.xticks(np.arange(2025, 2056, 5))

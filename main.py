@@ -21,8 +21,9 @@ from Code.Results import Results
 #### Define Input Files ####
 sample_sizes = [8640]
 # sample_sizes = ["Collab"]
-case_study_name = "sc_pathways_med_RE"
-# case_study_name = "two_country_emission_baseline_Collab"
+# case_study_name = "sc_pathways_med_RE"
+# case_study_name = "two_country_pathways_Collab"
+case_study_name = "two_country_comparable_cheaper_cable_pathways_Collab"
 
 for sample in sample_sizes:
     # case_study_name = f"MEX_{sample}"
@@ -139,8 +140,11 @@ for sample in sample_sizes:
                 DPhil_Plotting.plot_seasonal_mean_daily_flows_by_location(my_network, case_study_name,
                                                location_parameters_df, results_folder)
                 time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
-                                                                                           scenario_name, simulation_factor)
+                                                                                           scenario_name, simulation_factor=simulation_factor)
+                Results.add_hvdc_annual_flows_to_timeseries(time_series_df, my_network, location_parameters_df)
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
+                curtailment = Results.calculate_curtailment_with_trade(time_series_df, location_parameters_df)
+                curtailment.to_csv(os.path.join(results_folder, "fossil_gen_v_curtailment.csv"))
                 summary_df.to_csv(os.path.join(results_folder, "summary_df.csv"))
             else:
                 Results.save_yearly_flows_to_csv(my_network, yearly_path)
@@ -149,8 +153,9 @@ for sample in sample_sizes:
                 DPhil_Plotting.plot_seasonal_mean_daily_flows_stacked(my_network, results_folder)
                 DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
         
-                time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name)
+                time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name, simulation_factor=simulation_factor)
                 curtailment = Results.calculate_curtailment(time_series_df)
+                curtailment.to_csv(os.path.join(results_folder, "fossil_gen_v_curtailment.csv"))
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
                 summary_df.to_csv(os.path.join(results_folder, "summary_results.csv"))
         

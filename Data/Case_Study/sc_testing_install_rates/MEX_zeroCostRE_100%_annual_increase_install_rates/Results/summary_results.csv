@@ -1,5 +1,0 @@
-,scenario,asset_name,total_system_cost_BUSD,total_capex_BUSD,total_opex_BUSD,total_cost_BUSD,total_emissions_MtCO2e
-0,MEX_zeroCostRE_100%_annual_increase_install_rates,RE_PV_MY,360.833021248175,0.0,0.0,0.0,0.0
-1,MEX_zeroCostRE_100%_annual_increase_install_rates,RE_WIND_MY,360.833021248175,0.0,0.0,0.0,0.0
-2,MEX_zeroCostRE_100%_annual_increase_install_rates,PP_CO2_MY,360.833021248175,0.0,360.833021248175,360.833021248175,2677.313304638649
-3,MEX_zeroCostRE_100%_annual_increase_install_rates,EL_Demand_MY,360.833021248175,0.0,0.0,0.0,0.0

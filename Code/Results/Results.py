@@ -185,6 +185,58 @@ def calculate_curtailment(time_series_df: pd.DataFrame) -> pd.DataFrame:
 
     return results
 
+def calculate_curtailment_with_trade(time_series_df: pd.DataFrame,
+                                     location_parameters_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate curtailment and fossil generation per location per year,
+    accounting for HVDC imports.
+
+    Args:
+        time_series_df (pd.DataFrame): dataframe from export_multi_country_scenario_results
+        location_parameters_df (pd.DataFrame): must have index as loc number and column 'location_name'
+
+    Returns:
+        pd.DataFrame with columns: [year, location, fossil_gen, curtailment]
+    """
+    results = []
+
+    years = time_series_df["year"].tolist()
+
+    # Map loc index -> name (e.g. 0 -> "MEX")
+    loc_map = location_parameters_df["location_name"].to_dict()
+
+    for loc_idx, loc_name in loc_map.items():
+        # Columns for this location
+        demand_col = f"Total_Annual_Demand_loc{loc_idx}"
+        fossil_col = f"Fossil_Gen_GWh_loc{loc_idx}"
+
+        # All renewables gen columns (ending with _annual_generation_GWh_locX)
+        gen_cols = [c for c in time_series_df.columns
+                    if c.endswith(f"_annual_generation_GWh_loc{loc_idx}")]
+
+        # HVDC imports: look for reverse flows ending with -> this location
+        hvdc_import_cols = [c for c in time_series_df.columns
+                            if c.startswith("HVDC_") and c.endswith(f"{loc_idx}_annual_reverse_GWh")]
+
+        for i, year in enumerate(years):
+            demand = time_series_df.at[i, demand_col] if demand_col in time_series_df else 0.0
+            fossil_gen = time_series_df.at[i, fossil_col] if fossil_col in time_series_df else 0.0
+            renewables_gen = sum(time_series_df.at[i, c] for c in gen_cols)
+            hvdc_imports = sum(time_series_df.at[i, c] for c in hvdc_import_cols)
+
+            supply = fossil_gen + renewables_gen + hvdc_imports
+            curtailment = max(0.0, supply - demand)
+
+            results.append({
+                "year": year,
+                "location": loc_name,
+                "fossil_gen": fossil_gen,
+                "curtailment": curtailment
+            })
+
+    return pd.DataFrame(results)
+
+
 
 def export_multi_country_scenario_results(my_network, network_structure_df, scenario_name, simulation_factor):
     print("========= Exporting multi-country scenario results ========")
@@ -192,6 +244,10 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
     years = list(range(1, num_years + 1))
     discount_rate = float(my_network.system_parameters_df.loc["discount_rate", "value"])
     discount_factors = 1 / ((1 + discount_rate) ** np.arange(num_years))
+    # In network structure asset 1 is always pv so the below works hard coded for how I wrote my case studies
+    sampled_days = int((my_network.assets[1].number_of_edges / 24) / num_years) 
+    simulation_factor = 365 / sampled_days
+
 
     data = {}
 
@@ -288,7 +344,7 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
                 annual_payments = [0] * num_years
             safe_assign(f"{name}_annual_CAPEX_BUSD_loc{loc}", annual_payments)
 
-        # Create dataframe
+    # Create dataframe
     time_series_df = pd.DataFrame(data)
     # Collect payment & OPEX columns from new naming convention
     payment_cols = [
@@ -312,10 +368,11 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
     ]
 
     # Totals per year
-    total_gen = time_series_df[gen_cols].sum(axis=1)
     total_capex = time_series_df[payment_cols].sum(axis=1)
-    total_opex = time_series_df[opex_cols].sum(axis=1)
-    total_demand = time_series_df[demand_cols].sum(axis=1)
+    # Adjust energy and OPEX for simulation factor
+    total_opex = time_series_df[opex_cols].sum(axis=1) * simulation_factor
+    total_demand = time_series_df[demand_cols].sum(axis=1) * simulation_factor
+    total_gen = time_series_df[gen_cols].sum(axis=1) * simulation_factor
 
     # LCOE & LCUE (USD/MWh → USD/kWh)
     time_series_df["System_LCOE_USD_per_kWh"] = ((total_capex + total_opex) / total_gen) * 1000
@@ -365,6 +422,58 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
     summary_df = pd.DataFrame(cost_summary)
 
     return time_series_df, summary_df
+
+def add_hvdc_annual_flows_to_timeseries(time_series_df: pd.DataFrame, network, location_parameters_df):
+    """
+    Adds annual HVDC flow totals (per direction and combined) into the time_series_df.
+
+    Args:
+        time_series_df (pd.DataFrame): existing results dataframe with 'year' column
+        transport_asset: EL_Transport asset that has get_yearly_flows()
+        simulation_factor (float): scaling factor to adjust sampled days to annual
+
+    Returns:
+        pd.DataFrame with new HVDC flow columns added.
+    """
+    assets = network.assets
+    for asset in assets:
+        if asset.asset_name == "EL_Transport_MY":
+            
+            yearly_flows_df = asset.get_yearly_flows()  # hourly/sampled flows per year, both directions
+        
+            # Collect all HVDC columns
+            hvdc_cols = [c for c in yearly_flows_df.columns]
+            years = sorted({int(c.split("_")[-1]) for c in hvdc_cols})
+        
+            source = asset.source_node_location
+            target = asset.target_node_location
+            source_loc_name = location_parameters_df.iloc[source]["location_name"]
+            target_loc_name = location_parameters_df.iloc[target]["location_name"]
+
+        
+            # Prepare per-year results
+            forward_totals = []
+            reverse_totals = []
+            combined_totals = []
+        
+            for y in years:
+                forward_col = f"{source}-{target}_year_{y}"
+                reverse_col = f"{target}-{source}_year_{y}"
+        
+                forward_sum = yearly_flows_df[forward_col].sum(skipna=True)
+                reverse_sum = yearly_flows_df[reverse_col].sum(skipna=True)
+        
+                forward_totals.append(forward_sum)
+                reverse_totals.append(reverse_sum)
+                combined_totals.append(forward_sum + reverse_sum)
+    
+            # Add into time_series_df aligned with 'year'
+            time_series_df[f"HVDC_{source_loc_name}-{target_loc_name}_annual_forward_GWh"] = forward_totals
+            time_series_df[f"HVDC_{target_loc_name}-{source_loc_name}_annual_reverse_GWh"] = reverse_totals
+            time_series_df[f"HVDC_{source_loc_name}-{target_loc_name}_annual_total_GWh"] = combined_totals
+
+    return time_series_df
+
 
 def save_yearly_flows_to_csv(network, output_path):
     """
@@ -557,19 +666,26 @@ def get_lcoe_per_year(network, output_path=None):
 
 def get_grid_intensity(network, output_path=None):
     """
-    Saves the annual grid intensity
+    Saves the annual grid intensity. This is not adjusted by simulation factor
     """
     num_years = network.assets[0].num_years
-
     total_gen_energy = np.zeros(num_years)
+    total_emissions = np.zeros(num_years)
     emissions_per_year = np.zeros(num_years)
     for asset in network.assets:
         try:
             if asset.asset_name != "EL_Demand_MY":
                 generation_per_year = np.sum(asset.get_yearly_flows()[:30], axis=1)
+                sampled_days = int((asset.number_of_edges / 24) / num_years)
+                simulation_factor = 365 / sampled_days
+                generation_per_year *= simulation_factor
             if asset.asset_name == "PP_CO2_MY":
                 emissions_per_year = asset.get_yearly_emissions()[:30]
+                sampled_days = int((asset.number_of_edges / 24) / num_years)
+                simulation_factor = 365 / sampled_days
+                emissions_per_year *= simulation_factor
                 
+            total_emissions += emissions_per_year
             total_gen_energy += generation_per_year
             grid_intensity_per_year = np.divide(emissions_per_year, total_gen_energy,
                                                 out=np.zeros_like(generation_per_year),
@@ -583,9 +699,5 @@ def get_grid_intensity(network, output_path=None):
     if output_path:    
         np.savetxt(output_path, grid_intensity_per_year, delimiter=",")
     return grid_intensity_per_year
-    
 
-            
-    
 
-    

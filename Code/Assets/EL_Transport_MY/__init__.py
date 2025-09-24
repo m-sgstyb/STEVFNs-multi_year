@@ -309,7 +309,7 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
                 data[key] = np.pad(array, (0, max_len - len(array)), constant_values=np.nan)
     
         return pd.DataFrame(data)
-
+        
 
     def get_yearly_usage_costs(self):
         """
