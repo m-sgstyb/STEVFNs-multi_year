@@ -130,7 +130,7 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             sizing_cost = sizing_constant * cp.max(self.flows)
             annualised_payment = sizing_cost * amort_factor
         except Exception as e:
-            print("Could not update sizing constant, sizing cost or annualised payment")
+            print("Could not update sizing constant, sizing cost or annualised payment:", e)
         try:
             discount_years = range(self.start_year, min(self.start_year + n, project_years))
             discount_vector = [(1 + discount_rate) ** -i for i in discount_years]
@@ -145,72 +145,62 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         # Return total cost for optimisation cost calculation
         return annualised_payment * sum(discount_vector)
     
-    # def _get_discounted_usage_cost(self):
-    #     discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
-    #     usage_constant = self.cost_fun_params["usage_constant"]
-    #     project_years = self.num_years
-    #     print("getting year change indices")
-    #     self._get_year_change_indices()
-    #     self.usage_costs = []
-    #     print("going into loop to determine usage NPV cost per year")
-    #     for y in range(project_years):
-    #         start_idx = self.year_change_indices[y]
-    #         end_idx = self.year_change_indices[y + 1]  # always safe now
-            
-    #         forward_flow = cp.sum(self.flows[start_idx:end_idx])
-    #         reverse_start = self.number_of_edges + start_idx
-    #         reverse_end = self.number_of_edges + end_idx
-    #         reverse_flow = cp.sum(self.flows[reverse_start:reverse_end])
-    #         total_flow = forward_flow + reverse_flow
-    
-    #         discounted_cost = (usage_constant * total_flow) / ((1 + discount_rate) ** y)
-    #         self.usage_costs.append(discounted_cost)
-    
-    #     return cp.sum(self.usage_costs)
-    
     def _get_discounted_usage_cost(self):
+        """
+        Calculates discounted operational (usage) costs by applying
+        a pre-discounted usage constant vector to yearly flow sums.
+        Ensures consistent net-present-value treatment and avoids
+        double-discounting across years.
+        """
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
         usage_constant = self.cost_fun_params["usage_constant"]
         project_years = self.num_years
-        # Determine sampled days scaling factor
-        sampled_days_per_year = int((self.number_of_edges / 24) / (self.num_years - 10))
-        simulation_factor = 365 / sampled_days_per_year
-        # Find start of each year in model indices
+        delay_years = 10  # construction delay, hardcoded now
+        # Sampling scale
         self._get_year_change_indices()
-    
-        delay_years = 10  # construction period
-        operation_start_year = self.start_year + delay_years
         year_indices = self.year_change_indices.copy()
-        self.usage_costs = []
     
+        # Scale factor to convert sampled hours to full-year hours
+        sampled_days_per_year = int((self.number_of_edges / 24) / (project_years - delay_years))
+        simulation_factor = 365 / sampled_days_per_year
+    
+        # Build vector of discounted usage constants for NPV weighting
+        self.usage_constants_discounted = [
+            usage_constant / ((1 + discount_rate) ** y) for y in range(project_years)
+        ]
+    
+        # Define perational years of cable within project
+        op_years = max(0, project_years - delay_years)
+        
+        # Initialise storage
+        self.usage_costs = []
         for y in range(project_years):
-            # Only add OPEX costs after operation starts
+            # No costs before operation
             if y < delay_years:
                 self.usage_costs.append(0)
                 continue
-    
-            start_idx = year_indices[y]
-            end_idx = year_indices[y + 1]
-    
-            # Forward and reverse flows for the operational year
+            # Define current operational year for correct indexing
+            op_year = y - delay_years
+            # Year indices (flow windows per sampled days in each year)
+            start_idx = year_indices[op_year]
+            end_idx = year_indices[op_year + 1]
+            # Forward + reverse flow sums
             forward_flow = cp.sum(self.flows[start_idx:end_idx])
             reverse_start = self.number_of_edges + start_idx
             reverse_end = self.number_of_edges + end_idx
             reverse_flow = cp.sum(self.flows[reverse_start:reverse_end])
     
             total_flow = forward_flow + reverse_flow
-            # Scale flows to full-year
             total_flow_scaled = total_flow * simulation_factor
     
-            # Real calendar year for discounting = project year + decision offset
-            discount_year = y + self.start_year
-            discounted_cost = (usage_constant * total_flow_scaled) / ((1 + discount_rate) ** discount_year)
+            # Apply pre-discounted usage constant for that year
+            discounted_cost = self.usage_constants_discounted[y] * total_flow_scaled
     
             self.usage_costs.append(discounted_cost)
     
+        # Return total NPV of usage costs
         return cp.sum(self.usage_costs)
 
-    
     def _update_distance(self):
         #Function that calculates approximate distance between the source and target nodes "as the bird flies"#
         lat_lon_0 = self.network.lat_lon_df.iloc[int(self.source_node_location)]
@@ -287,12 +277,21 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             start_idx = year_indices[y]
             end_idx = year_indices[y + 1]
         
-            if y < 10:  # before operations start, hardcoded, needs to be depending on source node times
+            if y < 10 or (y - 9) >= len(year_indices):
                 forward_flow = np.full(end_idx - start_idx, 0)
                 reverse_flow = np.full(end_idx - start_idx, 0)
             else:
-                start_idx = year_indices[y - 10] # Hard-coded 10-year offset for install
-                end_idx = year_indices[y - 9] # Hard-coded 10-year offset for install
+                start_idx = year_indices[y - 10]
+                end_idx = year_indices[y - 9]    
+        
+            # if y < 10:  # before operations start, hardcoded, needs to be depending on source node times
+            #     forward_flow = np.full(end_idx - start_idx, 0)
+            #     reverse_flow = np.full(end_idx - start_idx, 0)
+            # else:
+            #     start_idx = year_indices[y - 10] # Hard-coded 10-year offset for install
+            #     end_idx = year_indices[y - 9] # Hard-coded 10-year offset for install
+            
+            
                 forward_flow = self.flows[start_idx:end_idx].value
                 reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
             data[f"{source}-{target}_year_{real_year}"] = forward_flow
