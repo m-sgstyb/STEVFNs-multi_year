@@ -25,13 +25,13 @@ sample_sizes = [8640]
 
 # case_study_name = "two_country_pathways_Collab"
 # case_study_name = "two_country_comparable_pathways_Collab"
-# case_study_name = "two_country_pathways_emissions_local_Collab"
+case_study_name = "two_country_pathways_emissions_local_Collab"
 # case_study_name = "three_country_baseline_emissions_Collab"
 # case_study_name = "three_country_pathways_local_Collab"
 
 for sample in sample_sizes:
     # case_study_name = f"MEX_{sample}"
-    case_study_name = f"two_country_baseline_emissions_global_{sample}_Collab"
+    # case_study_name = f"two_country_baseline_emissions_global_{sample}_Collab"
     # case_study_name = f"emissions_Baselines_{sample}"
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
