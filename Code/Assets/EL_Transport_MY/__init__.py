@@ -5,7 +5,7 @@ Created on Sat May 31 16:36:45 2025
 
 @author: Mónica Sagastuy-Breña
 Based on EL_Transport_Asset by:
-@author: aniqahsan
+    @author: aniqahsan
 """
 
 import os
@@ -168,10 +168,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         self.usage_constants_discounted = [
             usage_constant / ((1 + discount_rate) ** y) for y in range(project_years)
         ]
-    
-        # Define perational years of cable within project
-        op_years = max(0, project_years - delay_years)
-        
         # Initialise storage
         self.usage_costs = []
         for y in range(project_years):
@@ -283,14 +279,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             else:
                 start_idx = year_indices[y - 10]
                 end_idx = year_indices[y - 9]    
-        
-            # if y < 10:  # before operations start, hardcoded, needs to be depending on source node times
-            #     forward_flow = np.full(end_idx - start_idx, 0)
-            #     reverse_flow = np.full(end_idx - start_idx, 0)
-            # else:
-            #     start_idx = year_indices[y - 10] # Hard-coded 10-year offset for install
-            #     end_idx = year_indices[y - 9] # Hard-coded 10-year offset for install
-            
             
                 forward_flow = self.flows[start_idx:end_idx].value
                 reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
