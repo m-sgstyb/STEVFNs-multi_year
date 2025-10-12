@@ -214,7 +214,7 @@ def calculate_curtailment_with_trade(time_series_df: pd.DataFrame,
         gen_cols = [c for c in time_series_df.columns
                     if c.endswith(f"_annual_generation_GWh_loc{loc_idx}")]
 
-        # HVDC imports: look for reverse flows ending with -> this location
+        # HVDC imports: look for reverse flows ending with this location index
         hvdc_import_cols = [c for c in time_series_df.columns
                             if c.startswith("HVDC_") and c.endswith(f"{loc_idx}_annual_reverse_GWh")]
 
@@ -244,10 +244,6 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
     years = list(range(1, num_years + 1))
     discount_rate = float(my_network.system_parameters_df.loc["discount_rate", "value"])
     discount_factors = 1 / ((1 + discount_rate) ** np.arange(num_years))
-    # In network structure asset 1 is always pv so the below works hard coded for how I wrote my case studies
-    sampled_days = int((my_network.assets[1].number_of_edges / 24) / num_years) 
-    simulation_factor = 365 / sampled_days
-
 
     data = {}
 
@@ -356,7 +352,7 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
         if "_annual_OPEX_BUSD_" in col
     ]
 
-    # Demand and generation columns
+    # Demand and generation columns, gets for all locations that have this format
     demand_cols = [
         col for col in time_series_df.columns
         if col.startswith("Discounted_Annual_Demand_loc")
@@ -370,9 +366,9 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
     # Totals per year
     total_capex = time_series_df[payment_cols].sum(axis=1)
     # Adjust energy and OPEX for simulation factor
-    total_opex = time_series_df[opex_cols].sum(axis=1) * simulation_factor
-    total_demand = time_series_df[demand_cols].sum(axis=1) * simulation_factor
-    total_gen = time_series_df[gen_cols].sum(axis=1) * simulation_factor
+    total_opex = time_series_df[opex_cols].sum(axis=1)
+    total_demand = time_series_df[demand_cols].sum(axis=1)
+    total_gen = time_series_df[gen_cols].sum(axis=1)
 
     # LCOE & LCUE (USD/MWh → USD/kWh)
     time_series_df["System_LCOE_USD_per_kWh"] = ((total_capex + total_opex) / total_gen) * 1000
@@ -423,7 +419,7 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
 
     return time_series_df, summary_df
 
-def add_hvdc_annual_flows_to_timeseries(time_series_df: pd.DataFrame, network, location_parameters_df):
+def add_hvdc_annual_flows_to_timeseries(time_series_df: pd.DataFrame, network, location_parameters_df, simulation_factor=1.0):
     """
     Adds annual HVDC flow totals (per direction and combined) into the time_series_df.
 
@@ -459,9 +455,9 @@ def add_hvdc_annual_flows_to_timeseries(time_series_df: pd.DataFrame, network, l
             for y in years:
                 forward_col = f"{source}-{target}_year_{y}"
                 reverse_col = f"{target}-{source}_year_{y}"
-        
-                forward_sum = yearly_flows_df[forward_col].sum(skipna=True)
-                reverse_sum = yearly_flows_df[reverse_col].sum(skipna=True)
+                # Get sums over the hourly optimisation flows and scale with simulation factor
+                forward_sum = yearly_flows_df[forward_col].sum(skipna=True) * simulation_factor
+                reverse_sum = yearly_flows_df[reverse_col].sum(skipna=True) * simulation_factor
         
                 forward_totals.append(forward_sum)
                 reverse_totals.append(reverse_sum)
@@ -511,18 +507,113 @@ def save_yearly_flows_to_csv(network, output_path):
     df.to_csv(output_path, index=False)
     print(f"[✓] Yearly flows saved to {output_path}")
     
+
+    
+# def save_yearly_flows_to_csv_multiloc(network, location_parameters_df, output_path):
+#     """
+#     Saves all asset flows split by year into a CSV file.
+#     - HVDC transport assets are labeled as HVDC LocA-LocB_yN.
+#     - Other assets use their asset name.
+#     - Handles different year lengths by padding with NaN.
+#     """
+#     flow_data = {}
+
+#     for asset in network.assets:
+#         if not hasattr(asset, "get_yearly_flows"):
+#             continue  # Skip assets without flow chunk method
+
+#         name = asset.asset_name.lower()
+
+#         try:
+#             yearly_chunks = asset.get_yearly_flows()
+#         except Exception as e:
+#             print(f"[Skip] {asset.asset_name}: {e}")
+#             continue
+
+#         # HVDC / transport case
+#         if "el_transport" in name:
+#             df = yearly_chunks  # assuming it's a DataFrame with col names like '0-1_year_5'
+#             for col in df.columns:
+#                 try:
+#                     real_year = int(col.split("_year_")[1])
+#                 except Exception:
+#                     continue
+
+#                 direction = col.split("_year_")[0]
+#                 try:
+#                     source_id, target_id = map(int, direction.split("-"))
+#                 except Exception as e:
+#                     print(f"[Skip] Could not parse source/target from '{direction}': {e}")
+#                     continue
+
+#                 source_loc_name = location_parameters_df.iloc[source_id]["location_name"]
+#                 target_loc_name = location_parameters_df.iloc[target_id]["location_name"]
+
+#                 col_name = f"HVDC {source_loc_name}-{target_loc_name}_y{real_year}"
+#                 flow_data[col_name] = np.array(df[col]).flatten()
+
+#         else:
+#             if name not in ["CO2_Budget_MY", "EL_Demand_MY", "EL_Transport_MY"]:
+#                 # Locations for generator assets
+#                 gen_locs = sorted({getattr(a, "target_node_location") for a in network.assets[1:] if a.asset_name not in ["CO2_Budget_MY", "EL_Demand_MY", "EL_Transport_MY"]})
+#                 for loc in gen_locs:
+#                     # Example: fetch location name
+#                     loc_name = location_parameters_df.loc[
+#                         location_parameters_df["Location"] == loc, "location_name"
+#                     ].values[0]
+        
+#                     # You can now build column names like:
+#                     # f"{asset.asset_name}_{loc_name}_y{year_idx+1}"
+#                     # when saving flows
+#             elif asset.asset_name == "EL_Demand_MY":
+#                 # Demand-type assets
+#                 demand_locs = sorted({
+#                     getattr(a, "node_location")
+#                     for a in network.assets[1:]
+#                     if hasattr(a, "node_location")
+#                 })
+           
+#                 for loc in demand_locs:
+#                     loc_name = location_parameters_df.loc[
+#                         location_parameters_df["Location"] == loc, "location_name"
+#                     ].values[0]
+            
+#         for year_idx, flow_array in enumerate(yearly_chunks):
+#             col_name = f"{asset.asset_name}_{loc_name}_y{year_idx+1}"
+#             flow_data[col_name] = np.array(flow_array).flatten()
+
+#     # Determine max column length for padding
+#     if not flow_data:
+#         print("No flows found to save.")
+#         return
+
+#     max_len = max(len(arr) for arr in flow_data.values())
+
+#     # Pad all arrays with NaN to equal length
+#     for key in flow_data:
+#         padded = np.full(max_len, np.nan)
+#         padded[:len(flow_data[key])] = flow_data[key]
+#         flow_data[key] = padded
+
+#     # Create DataFrame and save
+#     df_out = pd.DataFrame(flow_data)
+#     df_out.to_csv(output_path, index=False)
+#     print(f"[✓] Yearly flows saved to {output_path}")
+
+
+
 def save_yearly_flows_to_csv_multiloc(network, location_parameters_df, output_path):
     """
     Saves all asset flows split by year into a CSV file.
     - HVDC transport assets are labeled as HVDC LocA-LocB_yN.
-    - Other assets use their asset name.
+    - Other assets are labeled as AssetName_Location_yN.
     - Handles different year lengths by padding with NaN.
     """
     flow_data = {}
 
     for asset in network.assets:
         if not hasattr(asset, "get_yearly_flows"):
-            continue  # Skip assets without flow chunk method
+            continue
 
         name = asset.asset_name.lower()
 
@@ -532,10 +623,13 @@ def save_yearly_flows_to_csv_multiloc(network, location_parameters_df, output_pa
             print(f"[Skip] {asset.asset_name}: {e}")
             continue
 
-        # HVDC / transport case
+        # --- HVDC / transport assets ---
         if "el_transport" in name:
-            df = yearly_chunks  # assuming it's a DataFrame with col names like '0-1_year_5'
-            for col in df.columns:
+            if not isinstance(yearly_chunks, pd.DataFrame):
+                print(f"[Skip] {asset.asset_name}: HVDC expected DataFrame, got {type(yearly_chunks)}")
+                continue
+
+            for col in yearly_chunks.columns:
                 try:
                     real_year = int(col.split("_year_")[1])
                 except Exception:
@@ -552,28 +646,42 @@ def save_yearly_flows_to_csv_multiloc(network, location_parameters_df, output_pa
                 target_loc_name = location_parameters_df.iloc[target_id]["location_name"]
 
                 col_name = f"HVDC {source_loc_name}-{target_loc_name}_y{real_year}"
-                flow_data[col_name] = np.array(df[col]).flatten()
+                flow_data[col_name] = np.array(yearly_chunks[col]).astype(float).flatten()
 
+        # --- Non-transport assets ---
         else:
-            # Non-transport asset: location info optional
-            for year_idx, flow_array in enumerate(yearly_chunks):
-                col_name = f"{asset.asset_name}_y{year_idx+1}"
-                flow_data[col_name] = np.array(flow_array).flatten()
+            # Identify the location for this asset
+            if hasattr(asset, "target_node_location"):
+                loc = asset.target_node_location
+            elif hasattr(asset, "node_location"):
+                loc = asset.node_location
+            else:
+                loc = None
 
-    # Determine max column length for padding
+            if loc is not None:
+                loc_name = location_parameters_df.loc[
+                    location_parameters_df["Location"] == loc, "location_name"
+                ].values[0]
+            else:
+                loc_name = "UnknownLoc"
+
+            # yearly_chunks should be a list/array of flows here
+            for year_idx, flow_array in enumerate(yearly_chunks):
+                col_name = f"{asset.asset_name}_{loc_name}_y{year_idx+1}"
+                flow_data[col_name] = np.array(flow_array).astype(float).flatten()
+
+    # --- Padding to equal length ---
     if not flow_data:
         print("No flows found to save.")
         return
 
     max_len = max(len(arr) for arr in flow_data.values())
 
-    # Pad all arrays with NaN to equal length
     for key in flow_data:
         padded = np.full(max_len, np.nan)
         padded[:len(flow_data[key])] = flow_data[key]
         flow_data[key] = padded
 
-    # Create DataFrame and save
     df_out = pd.DataFrame(flow_data)
     df_out.to_csv(output_path, index=False)
     print(f"[✓] Yearly flows saved to {output_path}")

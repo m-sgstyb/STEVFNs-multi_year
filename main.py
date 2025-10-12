@@ -22,13 +22,17 @@ from Code.Results import Results
 sample_sizes = [8640]
 # sample_sizes = ["Collab"]
 # case_study_name = "sc_pathways_med_RE"
+
 # case_study_name = "two_country_pathways_Collab"
-# case_study_name = "two_country_comparable_cheaper_cable_pathways_Collab"
+# case_study_name = "two_country_comparable_pathways_Collab"
+# case_study_name = "two_country_pathways_emissions_local_Collab"
+# case_study_name = "three_country_baseline_emissions_Collab"
+# case_study_name = "three_country_pathways_local_Collab"
 
 for sample in sample_sizes:
     # case_study_name = f"MEX_{sample}"
-    # case_study_name = f"two_country_baseline_emissions_global_{sample}_Collab"
-    case_study_name = f"emissions_Baselines_{sample}"
+    case_study_name = f"two_country_baseline_emissions_global_{sample}_Collab"
+    # case_study_name = f"emissions_Baselines_{sample}"
     base_folder = os.path.dirname(__file__)
     data_folder = os.path.join(base_folder, "Data")
     case_study_folder = os.path.join(data_folder, "Case_Study", case_study_name)
@@ -141,7 +145,7 @@ for sample in sample_sizes:
                                                location_parameters_df, results_folder)
                 time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
                                                                                            scenario_name, simulation_factor=simulation_factor)
-                Results.add_hvdc_annual_flows_to_timeseries(time_series_df, my_network, location_parameters_df)
+                Results.add_hvdc_annual_flows_to_timeseries(time_series_df, my_network, location_parameters_df, simulation_factor=simulation_factor)
                 time_series_df.to_csv(os.path.join(results_folder, "time_series_results.csv"))
                 curtailment = Results.calculate_curtailment_with_trade(time_series_df, location_parameters_df)
                 curtailment.to_csv(os.path.join(results_folder, "fossil_gen_v_curtailment.csv"))

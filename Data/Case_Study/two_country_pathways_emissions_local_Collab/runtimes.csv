@@ -1,0 +1,2 @@
+Case_study,scenario,build_time_s,build_time_min,update_time_s,update_time_min,solve_time_s,solve_time_min,full_time_s,full_time_min
+two_country_pathways_emissions_local_Collab,MEX_2042_high-CHL_2035_high_cheapHVDC,29.495301723480225,0.49158836205800377,0.18167877197265625,0.003027979532877604,77.29874467849731,1.2883124113082887,106.98386669158936,1.7830644448598225

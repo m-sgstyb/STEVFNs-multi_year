@@ -265,6 +265,15 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
                                                                     emissions_edges_end)]
         return annual_emissions
     
+    def get_yearly_emission_costs(self):
+        annual_emissions = self.get_yearly_emissions().copy()
+        total_emissions = cp.sum(annual_emissions, axis=1) 
+        # Get a method that takes a new parameter for carbon tax, extends for 30y and updates to NPV
+        # Use that to calculate the cost of emissions across years
+        # Does it stay convex?
+        return
+        
+    
     def get_yearly_flows(self):
         """
         Returns a list of flow slices split by each year using year_change_indices
