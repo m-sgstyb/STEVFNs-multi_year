@@ -126,6 +126,7 @@ def export_scenario_results(my_network, scenario_name, simulation_factor=1.0):
     # ===========================
     system_cost = my_network.problem.value
     cost_summary = []
+    
     for asset in my_network.assets[1:]:
         if hasattr(asset, "get_yearly_payments"):
             capex_list = asset.get_yearly_payments()
@@ -144,7 +145,8 @@ def export_scenario_results(my_network, scenario_name, simulation_factor=1.0):
 
         emissions_list = asset.get_yearly_emissions() if hasattr(asset, "get_yearly_emissions") else [0] * num_years
         total_emissions_asset = sum(emissions_list)
-
+        
+           
         cost_summary.append({
             "scenario": scenario_name,
             "asset_name": asset.asset_name,
@@ -405,6 +407,9 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
         emissions_list = asset.get_yearly_emissions() if hasattr(asset, "get_yearly_emissions") else [0] * num_years
         total_emissions_asset = sum(emissions_list)
 
+        hvdc_size = asset.size() if "EL_Transport" in asset.asset_name else 0
+        
+           
         cost_summary.append({
             "scenario": scenario_name,
             "asset_name": asset.asset_name,
@@ -412,7 +417,8 @@ def export_multi_country_scenario_results(my_network, network_structure_df, scen
             "total_capex_BUSD": total_capex_asset,
             "total_opex_BUSD": total_opex_asset,
             "total_cost_BUSD": total_cost_asset,
-            "total_emissions_MtCO2e": total_emissions_asset
+            "total_emissions_MtCO2e": total_emissions_asset,
+            "HVDC_size_GWp": hvdc_size
         })
 
     summary_df = pd.DataFrame(cost_summary)

@@ -65,8 +65,8 @@ for sample in sample_sizes:
     
     emissions_dict = {}
     
-    for counter1 in range(len(scenario_folders_list)):
-    # for counter1 in range(1):
+    # for counter1 in range(len(scenario_folders_list)):
+    for counter1 in range(1):
         # Read Input Files ###
         scenario_folder = scenario_folders_list[-1-counter1]
         my_network.scenario_name = os.path.basename(scenario_folder)
