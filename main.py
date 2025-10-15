@@ -25,9 +25,9 @@ sample_sizes = [8640]
 
 # case_study_name = "two_country_pathways_Collab"
 # case_study_name = "two_country_comparable_pathways_Collab"
-case_study_name = "two_country_pathways_emissions_local_Collab"
+# case_study_name = "two_country_pathways_emissions_local_Collab"
 # case_study_name = "three_country_baseline_emissions_Collab"
-# case_study_name = "three_country_pathways_local_Collab"
+case_study_name = "three_country_pathways_local_Collab"
 
 for sample in sample_sizes:
     # case_study_name = f"MEX_{sample}"
@@ -65,8 +65,8 @@ for sample in sample_sizes:
     
     emissions_dict = {}
     
-    # for counter1 in range(len(scenario_folders_list)):
-    for counter1 in range(1):
+    for counter1 in range(len(scenario_folders_list)):
+    # for counter1 in range(1):
         # Read Input Files ###
         scenario_folder = scenario_folders_list[-1-counter1]
         my_network.scenario_name = os.path.basename(scenario_folder)
