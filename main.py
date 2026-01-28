@@ -21,13 +21,14 @@ from Code.Results import Results
 #### Define Input Files ####
 sample_sizes = [8640]
 # sample_sizes = ["Collab"]
-# case_study_name = "sc_pathways_med_RE"
+# case_study_name = "toy_problem"
+case_study_name = "sc_pathways_med_RE"
 
 # case_study_name = "two_country_pathways_Collab"
 # case_study_name = "two_country_comparable_pathways_Collab"
 # case_study_name = "two_country_pathways_emissions_local_Collab"
 # case_study_name = "three_country_baseline_emissions_Collab"
-case_study_name = "three_country_pathways_local_Collab"
+# case_study_name = "three_country_pathways_local_Collab"
 
 for sample in sample_sizes:
     # case_study_name = f"MEX_{sample}"
@@ -140,7 +141,7 @@ for sample in sample_sizes:
                                                                      location_parameters_df, results_folder)
                 DPhil_Plotting.plot_dual_install_pathways_all_locations(my_network, network_structure_df, "RE_PV_MY", "RE_WIND_MY",
                                                                         results_folder,
-                                                             tech_name_1="PV", tech_name_2="Wind")
+                                                              tech_name_1="PV", tech_name_2="Wind")
                 DPhil_Plotting.plot_seasonal_mean_daily_flows_by_location(my_network, case_study_name,
                                                location_parameters_df, results_folder)
                 time_series_df, summary_df = Results.export_multi_country_scenario_results(my_network, network_structure_df,
@@ -152,10 +153,11 @@ for sample in sample_sizes:
                 summary_df.to_csv(os.path.join(results_folder, "summary_df.csv"))
             else:
                 Results.save_yearly_flows_to_csv(my_network, yearly_path)
-                # DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
+                DPhil_Plotting.plot_yearly_flows(my_network, results_folder)
                 DPhil_Plotting.plot_yearly_flows_stacked(my_network, results_folder)
                 DPhil_Plotting.plot_seasonal_mean_daily_flows_stacked(my_network, results_folder)
                 DPhil_Plotting.get_dual_install_pathways(my_network.assets[1], my_network.assets[2], results_folder, "PV", "Wind")
+                # DPhil_Plotting.get_install_pathways(my_network.assets[0], results_folder, tech_name="Wind") # For plotting for the validation
         
                 time_series_df, summary_df = Results.export_scenario_results(my_network, scenario_name, simulation_factor=simulation_factor)
                 curtailment = Results.calculate_curtailment(time_series_df)

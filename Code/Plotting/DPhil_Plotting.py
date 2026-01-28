@@ -300,8 +300,10 @@ def plot_yearly_flows(network, output_folder):
 def plot_yearly_flows_stacked(network, output_folder):
     os.makedirs(output_folder, exist_ok=True)
     
-    tech_order = ["pp", "wind", "pv"]
-    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    # tech_order = ["pp", "wind", "pv"]
+    # tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    tech_order = ["wind"] # For legend to only include demand and wind in validation plots
+    tech_colors = {"wind": "#009BA1"} # For legend to only include demand and wind in validation plots
     demand_color = "red"
     
     # Collect flows by tech and demand by year
@@ -379,6 +381,8 @@ def plot_yearly_flows_stacked(network, output_folder):
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
+        plt.ylim(0,0.37)
+        plt.xlim(0,288)
         plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"), dpi=300)
         plt.close()
 
@@ -1043,14 +1047,18 @@ def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(years, new_installed, label="New Installed Capacity", color="#025773")
-    ax.plot(years, total_existing, color="navy", linewidth=2, marker="o", label="Total Existing Capacity")
+    ax.bar(years, new_installed, label="New Installed Capacity", color="#025773", alpha=0.5)
+    ax.plot(years, total_existing, color="#02384A", linewidth=2, marker="o", label="Total Existing Capacity")
 
     # ax.set_title(f"{tech_name} Capacity Installation Pathway")
     ax.set_xlabel("Year")
     ax.set_ylabel("Capacity [GWp]")
     ax.legend()
     ax.grid(True)
+    # xticks = np.arange(0, 10, 1)
+    # plt.xticks(xticks, xticks, fontsize=12) # plotting validation install paths directly
+    # ax.set_xticklabels(np.arange(1, 11, 1)) # plotting validation install paths directly
+    # plt.yticks(fontsize=12) # plotting validation install paths directly
     plt.tight_layout()
     #plt.show()
     plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name}.png"), dpi=300)
