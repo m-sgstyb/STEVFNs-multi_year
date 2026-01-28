@@ -2,3 +2,4 @@ Type,profile_filename,set_size,set_number
 0,MEX_30y,24,0
 1,CHL_30y,24,0
 2,WECC_30y,24,0
+3,validation_10y,24,0

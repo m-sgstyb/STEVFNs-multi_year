@@ -17,6 +17,15 @@ from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
 from Code.Results import get_new_input_params
 
+
+plt.rcParams.update({
+    "axes.labelsize": 14,   # axis label size
+    "xtick.labelsize": 12,  # x tick size
+    "ytick.labelsize": 12,  # y tick size
+    "legend.fontsize": 12,  # legend label size
+    "legend.title_fontsize": 13,
+})
+
 def logistic_curve(t, K, r, t0):
     '''
     
@@ -243,103 +252,8 @@ def plot_scurves(case_study_folder, tech_lim, assets_folder,
     plt.yticks(fontsize=12)
     plt.legend()
     plt.grid(True)
-    plt.show()
+    #plt.show()
     return
-
-def plot_asset_sizes_stacked(my_network, location_parameters_df, save_path=None):
-    '''
-    Manually hard-coded for specific assets in system for my thesis, needs to be
-    generalised if more assets need to be plotted
-
-    Parameters
-    ----------
-    my_network : STEVFNs network
-        Full network after running a STEVFNs modelling iteration
-    location_parameters_df : DataFrame
-        Contains coordinates and labels to find the location name and plot
-    save_path : PATH, optional
-        Path to save the plot to if it needs to be saved. The default is None.
-
-    Returns
-    -------
-    None.
-
-    '''
-    og_df = my_network.system_structure_df.copy()
-    asset_sizes_array = np.array([my_network.assets[counter].asset_size() for counter in range(len(og_df))])
-    og_df["Asset_Size"] = asset_sizes_array
-    max_asset_size = np.max(asset_sizes_array)
-    min_asset_size = max_asset_size * 1E-3
-
-    og_df = og_df[og_df["Asset_Size"] >= min_asset_size]
-    og_df = og_df[og_df['Asset_Class'] != 'CO2_Budget']
-    asset_class_list = np.sort(og_df["Asset_Class"].unique())
-
-    loc_1 = og_df["Location_1"].unique()
-    loc_name = location_parameters_df.loc[loc_1[0]]['location_name']
-
-    bars = []  # Collect all bars for the legend
-    pv_colors = ['#f35b04', '#f18701']
-    wind_colors = ['#126782', '#58B4D1']
-    pp_colors = ['#8d99ae']
-    bess_colors = ['#226f54', '#87c38f']
-    hvdc_color = ['#5e548e']
-    
-    # PV Capacity
-    if "RE_PV_Existing" in asset_class_list:
-        existing_pv = float(og_df.query("Asset_Class == 'RE_PV_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total PV", existing_pv, color=pv_colors[0], label="PV Existing", zorder=3))
-
-        if "RE_PV_Openfield_Lim" in asset_class_list:
-            new_pv = float(og_df.query("Asset_Class == 'RE_PV_Openfield_Lim'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total PV", new_pv, bottom=existing_pv, color=pv_colors[1], label="PV New", zorder=3))
-
-    # Wind Capacity
-    if "RE_WIND_Existing" in asset_class_list:
-        existing_wind = float(og_df.query("Asset_Class == 'RE_WIND_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total Wind", existing_wind, color=wind_colors[0], label="Wind Existing", zorder=3))
-
-        if "RE_WIND_Onshore_Lim" in asset_class_list:
-            new_wind = float(og_df.query("Asset_Class == 'RE_WIND_Onshore_Lim'")['Asset_Size'].iloc[0])
-            bars.append(plt.bar("Total Wind", new_wind, bottom=existing_wind, color=wind_colors[1], label="Wind New", zorder=3))
-
-    # Fossil Generation
-    if "PP_CO2_Existing" in asset_class_list:
-        existing_fossil = float(og_df.query("Asset_Class == 'PP_CO2_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Fossil Gen.", existing_fossil, color=pp_colors[0], label="Fossil Existing", zorder=3))
-        
-    # BESS assets
-    if "BESS_Existing" in asset_class_list:
-        existing_bess = float(og_df.query("Asset_Class == 'BESS_Existing'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total BESS", existing_bess, color=bess_colors[0], label="BESS Existing", zorder=3))
-    else:
-        existing_bess=0
-        
-    if "BESS" in asset_class_list:
-        new_bess = float(og_df.query("Asset_Class == 'BESS'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("Total BESS", new_bess, bottom=existing_bess, color=bess_colors[1], label="BESS New", zorder=3))
-    
-    if "EL_Transport" in asset_class_list:
-        hvdc_cable = float(og_df.query("Asset_Class == 'EL_Transport'")['Asset_Size'].iloc[0])
-        bars.append(plt.bar("EL_Transport", hvdc_cable, color=hvdc_color, label="HVDC Cable", zorder=3))
-    
-    
-    plt.xlabel(loc_name)
-    plt.ylabel("Asset Size (GWp)")
-    plt.title("Asset Sizes " + my_network.scenario_name)
-
-    # Use only unique labels in the legend to avoid duplicates
-    handles, labels = plt.gca().get_legend_handles_labels()
-    unique_labels = dict(zip(labels, handles))
-    plt.grid(zorder=0)
-    plt.legend(unique_labels.values(), unique_labels.keys())
-    
-    if save_path:
-        plt.savefig(save_path, bbox_inches='tight')
-
-    plt.show()
-    
-    return 
 
 def plot_yearly_flows(network, output_folder):
     """
@@ -372,13 +286,13 @@ def plot_yearly_flows(network, output_folder):
         for asset_name, chunks in asset_flows_by_year.items():
             if year < len(chunks):
                 plt.plot(chunks[year], label=asset_name, color=color_dict[asset_name])
-        plt.title(f"Year {year + 1} - Hourly Flows")
+        # plt.title(f"Year {year + 1} - Hourly Flows")
         plt.xlabel("Hour")
         plt.ylabel("Flow")
         plt.legend()
         plt.tight_layout()
         plt.grid(True)
-        plt.savefig(os.path.join(output_folder, f"flows_year_{year + 1}.png"))
+        plt.savefig(os.path.join(output_folder, f"flows_year_{year + 1}.png"), dpi=300)
         plt.close()
     
     print(f"[✓] Plots saved to folder: {output_folder}")
@@ -386,8 +300,10 @@ def plot_yearly_flows(network, output_folder):
 def plot_yearly_flows_stacked(network, output_folder):
     os.makedirs(output_folder, exist_ok=True)
     
-    tech_order = ["pp", "wind", "pv"]
-    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    # tech_order = ["pp", "wind", "pv"]
+    # tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    tech_order = ["wind"] # For legend to only include demand and wind in validation plots
+    tech_colors = {"wind": "#009BA1"} # For legend to only include demand and wind in validation plots
     demand_color = "red"
     
     # Collect flows by tech and demand by year
@@ -459,17 +375,419 @@ def plot_yearly_flows_stacked(network, output_folder):
         plt.plot(x, demand, color=demand_color, label="Demand",
                  linestyle="--", linewidth=1.5)
     
-        plt.title(f"Stacked Generation vs Demand – Year {year + 1}")
+        # plt.title(f"Stacked Generation vs Demand – Year {year + 1}")
         plt.xlabel("Hour")
         plt.ylabel("Power Flow")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
-        plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"))
+        plt.ylim(0,0.37)
+        plt.xlim(0,288)
+        plt.savefig(os.path.join(output_folder, f"stacked_year_{year + 1}.png"), dpi=300)
         plt.close()
 
-    
     print(f"[✓] Stacked plots saved to: {output_folder}")
+    
+def plot_seasonal_mean_daily_flows_stacked(network, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
+
+    tech_order = ["pp", "wind", "pv"]
+    tech_colors = {"pp": "#753D0D", "wind": "#009BA1", "pv": "#F0843C"}
+    demand_color = "red"
+
+    seasons = ["Winter", "Spring", "Summer", "Autumn"]
+
+    tech_flows_by_year = {tech: [] for tech in tech_order}
+    demand_by_year = []
+
+    # --- Collect profiles ---
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flows"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception:
+            continue
+
+        name = asset.asset_name.lower()
+        if "demand" in name:
+            demand_by_year = yearly_chunks
+        else:
+            for tech in tech_order:
+                if tech in name:
+                    tech_flows_by_year[tech].append(yearly_chunks)
+                    break
+
+    num_years = len(demand_by_year)
+    for year in range(num_years):
+        demand = np.array(demand_by_year[year])
+        n_hours = demand.shape[0]
+
+        if n_hours % 24 != 0:
+            print(f"⚠️ Year {year+1} does not divide evenly into 24h days ({n_hours} hours). Skipping.")
+            continue
+
+        n_days = n_hours // 24
+
+        # split days equally into 4 seasons
+        days_per_season = n_days // 4
+        season_indices = {
+            "Winter": np.arange(0, days_per_season),
+            "Spring": np.arange(days_per_season, 2 * days_per_season),
+            "Summer": np.arange(2 * days_per_season, 3 * days_per_season),
+            "Autumn": np.arange(3 * days_per_season, n_days),
+        }
+
+        demand_daily = demand.reshape(n_days, 24)
+
+        # concat 4 seasons sequentially
+        demand_concat = []
+        tech_concat = {tech: [] for tech in tech_order}
+
+        for season in seasons:
+            if len(season_indices[season]) == 0:
+                continue
+            # mean daily demand for season
+            demand_mean_day = demand_daily[season_indices[season]].mean(axis=0)
+            demand_concat.append(demand_mean_day)
+
+            # mean daily flows for each tech
+            for tech in tech_order:
+                flows_list = tech_flows_by_year[tech]
+                tech_total = np.zeros(24)
+
+                for flows in flows_list:
+                    if year < len(flows):
+                        flow_year = np.array(flows[year])
+                        if flow_year.shape != demand.shape:
+                            print(f"⚠️ Flow shape mismatch in year {year+1} for tech {tech}")
+                            continue
+
+                        flow_daily = flow_year.reshape(n_days, 24)
+                        tech_mean_day = flow_daily[season_indices[season]].mean(axis=0)
+                        tech_total += tech_mean_day
+
+                tech_concat[tech].append(tech_total)
+
+        # stack them side by side → axis length = 24 * num_seasons
+        if len(demand_concat) == 0:
+            print(f"[⚠️] No demand data found for {network.scenario_name}, skipping seasonal plot.")
+            plt.close()
+            return
+        else:
+            demand_concat = np.concatenate(demand_concat, axis=0)
+        for tech in tech_order:
+            tech_concat[tech] = np.concatenate(tech_concat[tech], axis=0)
+
+        x = np.arange(len(demand_concat))  # 96 if 4 seasons
+
+        remaining_demand = demand_concat.copy()
+        bottom = np.zeros_like(demand_concat)
+
+        plt.figure(figsize=(14, 6))
+
+        for tech in tech_order:
+            tech_total = tech_concat[tech]
+
+            used = np.minimum(tech_total, remaining_demand)
+            excess = tech_total - used
+
+            plt.fill_between(x, bottom, bottom + used,
+                             color=tech_colors[tech],
+                             label=tech.capitalize(),
+                             alpha=1.0,
+                             edgecolor='none')
+
+            plt.fill_between(x, bottom + used, bottom + used + excess,
+                             color=tech_colors[tech],
+                             alpha=0.3,
+                             edgecolor=tech_colors[tech])
+
+            bottom += tech_total
+            remaining_demand -= used
+            remaining_demand = np.clip(remaining_demand, 0, None)
+
+        # Demand line
+        plt.plot(x, demand_concat, color=demand_color, label="Demand",
+                 linestyle="--", linewidth=1.5)
+        # axis limits for consistent label placement
+        y_max = max(demand_concat.max(), bottom.max())
+        label_height = y_max * 1.05
+        # vertical season dividers + labels
+        for i in range(1, len(seasons)):
+            plt.axvline(i*24, color="grey", linestyle="--", linewidth=1)
+            plt.text(i*24 - 12, 1.02, seasons[i-1],
+                     ha="center", va="bottom", fontsize=10,
+                     transform=plt.gca().get_xaxis_transform())
+        # last season label
+        plt.text((len(seasons)-0.5)*24, 1.02, seasons[-1],
+                 ha="center", va="bottom", fontsize=10,
+                 transform=plt.gca().get_xaxis_transform())
+        
+        # custom x-ticks: 0–23 repeated per season
+        xticks = np.arange(0, 24*len(seasons), 6)  # tick every 6h
+        xtick_labels = [t % 24 for t in xticks]   # wrap every 24h
+        plt.xticks(xticks, xtick_labels)
+        
+        # start axes at origin
+        plt.xlim(0, 24*len(seasons))
+        plt.ylim(0, label_height * 1.1)
+
+        # plt.title(f"Seasonal Mean Daily Stacked Generation vs Demand – Year {year+1}")
+        plt.xlabel("Hour of mean day of sampled days in season")
+        plt.ylabel("Power Flow")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_folder, f"seasonal_mean_day_year_{year+1}.png"), dpi=300)
+        plt.close()
+
+    print(f"[✓] Seasonal mean daily plots saved to: {output_folder}")
+
+def plot_seasonal_mean_daily_flows_by_location(network, case_study_name,
+                                               location_parameters_df, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
+
+    # --- config ---
+    if case_study_name.endswith("_Collab"):
+        tech_order = ["pp", "hvdc", "wind", "pv"]
+    else:
+        tech_order = ["pp", "wind", "pv"]
+
+    tech_colors = {"pp": "#753D0D", "transport": "#047315", "wind": "#009BA1", "pv": "#F0843C"}
+    demand_color = "red"
+    seasons = ["Winter", "Spring", "Summer", "Autumn"]
+
+    flows_by_loc = defaultdict(dict)   # loc -> { "pp": [arrs], "HVDC X-Y": [arrs] }
+    demand_by_loc = {}
+
+    print("🔍 Collecting flows by location...")
+    for asset in network.assets:
+        if not hasattr(asset, "get_yearly_flows"):
+            continue
+        try:
+            yearly_chunks = asset.get_yearly_flows()
+        except Exception:
+            continue
+
+        name = getattr(asset, "asset_name", "").lower()
+
+        # --- Transport (HVDC) case ---
+        if case_study_name.endswith("_Collab") and "el_transport" in name:
+            df = yearly_chunks
+            for col in df.columns:
+                parts = col.split("_year_")
+                if len(parts) != 2:
+                    continue
+                try:
+                    real_year = int(parts[1])
+                except Exception:
+                    continue
+
+                direction = parts[0]
+                try:
+                    source_id, target_id = map(int, direction.split("-"))
+                except Exception:
+                    continue
+
+                src = location_parameters_df.iloc[source_id]["location_name"]
+                tgt = location_parameters_df.iloc[target_id]["location_name"]
+                label = f"HVDC {src}-{tgt}"
+
+                flow = np.asarray(df[col])
+                years_list = flows_by_loc[target_id].setdefault(label, [])
+                while len(years_list) <= real_year:
+                    years_list.append(np.zeros_like(flow))
+                years_list[real_year] = years_list[real_year] + np.nan_to_num(flow)
+            continue
+
+        # --- Non-transport assets ---
+        loc = getattr(asset, "target_node_location", getattr(asset, "node_location", None))
+        if loc is None:
+            continue
+
+        if "demand" in name:
+            demand_by_loc[loc] = yearly_chunks
+        else:
+            for tech in tech_order:
+                if tech != "transport" and tech in name:
+                    flows_by_loc[loc].setdefault(tech, []).append(yearly_chunks)
+                    break
+
+    # --- Normalize HVDC route labels ---
+    def normalize_hvdc_label(label):
+        try:
+            _, route = label.split(" ", 1)
+            src, tgt = route.split("-")
+            return "HVDC " + "-".join(sorted([src.strip(), tgt.strip()]))
+        except ValueError:
+            return label.strip()
+
+    hvdc_labels = sorted({
+        k for loc_data in flows_by_loc.values()
+        for k in loc_data if k.startswith("HVDC ")
+    })
+    hvdc_groups = {}
+    for lbl in hvdc_labels:
+        norm = normalize_hvdc_label(lbl)
+        hvdc_groups.setdefault(norm, []).append(lbl)
+
+    hvdc_colors = {}
+    for norm_route, labels in hvdc_groups.items():
+        if len(hvdc_groups) > 1:
+            shades = ["#047315", "#6DC27A"]  # dark/light green
+            for lbl, shade in zip(sorted(labels), shades):
+                hvdc_colors[lbl] = shade
+        else:
+            hvdc_colors[labels[0]] = "#047315"
+
+    # --- Plot per location ---
+    for loc, demand_by_year in demand_by_loc.items():
+        loc_name = location_parameters_df.iloc[loc]["location_name"]
+        tech_flows = flows_by_loc.get(loc, {})
+        num_years = len(demand_by_year)
+
+        for year in range(num_years):
+            demand = np.array(demand_by_year[year])
+            n_hours = demand.shape[0]
+
+            if n_hours % 24 != 0:
+                print(f"⚠️ {loc_name} Year {year+1} not divisible by 24h ({n_hours}). Skipping.")
+                continue
+
+            n_days = n_hours // 24
+            days_per_season = n_days // 4
+            season_indices = {
+                "Winter": np.arange(0, days_per_season),
+                "Spring": np.arange(days_per_season, 2*days_per_season),
+                "Summer": np.arange(2*days_per_season, 3*days_per_season),
+                "Autumn": np.arange(3*days_per_season, n_days),
+            }
+
+            demand_daily = demand.reshape(n_days, 24)
+            demand_concat, tech_concat = [], {tech: [] for tech in tech_order if tech != "transport"}
+            hvdc_concat = defaultdict(list)
+
+            for season in seasons:
+                if len(season_indices[season]) == 0:
+                    continue
+                demand_mean_day = demand_daily[season_indices[season]].mean(axis=0)
+                demand_concat.append(demand_mean_day)
+
+                # normal techs
+                for tech in tech_concat:
+                    flows_list_collection = tech_flows.get(tech, [])
+                    tech_total = np.zeros(24)
+                    for flows_list in flows_list_collection:
+                        if year < len(flows_list):
+                            flow_year = np.array(flows_list[year])
+                            flow_daily = flow_year.reshape(n_days, 24)
+                            tech_total += flow_daily[season_indices[season]].mean(axis=0)
+                    tech_concat[tech].append(tech_total)
+
+                # HVDCs
+                for label in [k for k in tech_flows.keys() if k.startswith("HVDC ")]:
+                    flows_list = tech_flows[label]
+                    hvdc_total = np.zeros(24)
+                    if year < len(flows_list):
+                        flow_year = np.array(flows_list[year])
+                        flow_daily = flow_year.reshape(n_days, 24)
+                        hvdc_total += flow_daily[season_indices[season]].mean(axis=0)
+                    hvdc_concat[label].append(hvdc_total)
+
+            if len(demand_concat) == 0:
+                continue
+
+            demand_concat = np.concatenate(demand_concat, axis=0)
+            for tech in tech_concat:
+                tech_concat[tech] = np.concatenate(tech_concat[tech], axis=0)
+            for label in hvdc_concat:
+                hvdc_concat[label] = np.concatenate(hvdc_concat[label], axis=0)
+
+            x = np.arange(len(demand_concat))
+            remaining_demand = demand_concat.copy()
+            bottom = np.zeros_like(demand_concat)
+
+            plt.figure(figsize=(14, 6))
+            seen_labels = set()
+
+
+            # --- plot in defined order: pp → hvdc → wind → pv ---
+            for tech in tech_order:
+                if tech == "hvdc":
+                    # loop through all HVDC routes
+                    for label, hvdc_series in hvdc_concat.items():
+                        hvdc_total = hvdc_series
+                        used = np.minimum(hvdc_total, remaining_demand)
+                        excess = hvdc_total - used
+                        lbl = None if label in seen_labels else label
+                        plt.fill_between(
+                            x, bottom, bottom + used,
+                            color=hvdc_colors.get(label, tech_colors["transport"]),
+                            label=lbl, alpha=1.0, edgecolor='none'
+                        )
+                        plt.fill_between(
+                            x, bottom + used, bottom + used + excess,
+                            color=hvdc_colors.get(label, tech_colors["transport"]),
+                            alpha=0.3, edgecolor='none'
+                        )
+                        seen_labels.add(label)
+                        bottom += hvdc_total
+                        remaining_demand = np.clip(remaining_demand - used, 0, None)
+
+                else:
+                    if tech not in tech_concat:
+                        continue
+                    tech_total = tech_concat[tech]
+                    used = np.minimum(tech_total, remaining_demand)
+                    excess = tech_total - used
+                    lbl = None if tech.capitalize() in seen_labels else tech.capitalize()
+                    plt.fill_between(
+                        x, bottom, bottom + used,
+                        color=tech_colors[tech], label=lbl,
+                        alpha=1.0, edgecolor='none'
+                    )
+                    plt.fill_between(
+                        x, bottom + used, bottom + used + excess,
+                        color=tech_colors[tech], alpha=0.3, edgecolor='none'
+                    )
+                    seen_labels.add(tech.capitalize())
+                    bottom += tech_total
+                    remaining_demand = np.clip(remaining_demand - used, 0, None)
+
+
+            # demand line
+            plt.plot(x, demand_concat, color=demand_color,
+                     label=None if "Demand" in seen_labels else "Demand",
+                     linestyle="--", linewidth=1.5)
+
+            # season dividers
+            for i in range(1, len(seasons)):
+                plt.axvline(i*24, color="grey", linestyle="--", linewidth=1)
+                plt.text(i*24 - 12, 1.02, seasons[i-1],
+                         ha="center", va="bottom", fontsize=10,
+                         transform=plt.gca().get_xaxis_transform())
+            plt.text((len(seasons)-0.5)*24, 1.02, seasons[-1],
+                     ha="center", va="bottom", fontsize=10,
+                     transform=plt.gca().get_xaxis_transform())
+
+            xticks = np.arange(0, 24*len(seasons), 6)
+            plt.xticks(xticks, [t % 24 for t in xticks])
+            plt.xlim(0, 24*len(seasons))
+            plt.ylim(0, max(demand_concat.max(), bottom.max())*1.1)
+
+            # plt.title(f"{loc_name} – Seasonal Mean Daily Stacked Flows – Year {year+1}")
+            plt.xlabel("Hour of mean day (per season)")
+            plt.ylabel("Power Flow")
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_folder, f"seasonal_mean_day_{loc_name}_year_{year+1}.png"), dpi=300)
+            plt.close()
+
+        print(f"[✓] Seasonal mean daily plots for {loc_name} saved to: {output_folder}")
+
+
 
 def plot_yearly_flows_stacked_by_location(network, case_study_name, location_parameters_df,
                                           output_folder):
@@ -594,16 +912,16 @@ def plot_yearly_flows_stacked_by_location(network, case_study_name, location_par
             hvdc_colors[labels[0]] = "#047315"
                     
     # --- Optional summary without creating keys accidentally ---
-    print("\n📊 Data summary per location:")
-    for loc in sorted(demand_by_loc.keys()):
-        print(f"  Location {loc}:")
-        print(f"    Demand years: {len(demand_by_loc[loc])}")
-        for tech in tech_order:
-            if tech == "transport":
-                hvdc_count = sum(1 for k in flows_by_loc.get(loc, {}) if k.startswith("HVDC "))
-                print(f"    transport assets (HVDC links): {hvdc_count}")
-            else:
-                print(f"    {tech} assets: {len(flows_by_loc.get(loc, {}).get(tech, []))}")
+    # print("\n📊 Data summary per location:")
+    # for loc in sorted(demand_by_loc.keys()):
+    #     print(f"  Location {loc}:")
+    #     print(f"    Demand years: {len(demand_by_loc[loc])}")
+    #     for tech in tech_order:
+    #         if tech == "transport":
+    #             hvdc_count = sum(1 for k in flows_by_loc.get(loc, {}) if k.startswith("HVDC "))
+    #             print(f"    transport assets (HVDC links): {hvdc_count}")
+    #         else:
+    #             print(f"    {tech} assets: {len(flows_by_loc.get(loc, {}).get(tech, []))}")
 
     # --- Plot per location ---
     for loc, demand_by_year in demand_by_loc.items():
@@ -697,13 +1015,13 @@ def plot_yearly_flows_stacked_by_location(network, case_study_name, location_par
                      linestyle="--", linewidth=1.5)
             seen_labels.add("Demand")
 
-            plt.title(f"{loc_name} – Stacked Generation vs Demand – Year {year}")
+            # plt.title(f"{loc_name} – Stacked Generation vs Demand – Year {year}")
             plt.xlabel("Hour")
             plt.ylabel("Power Flow")
             plt.grid(True)
             plt.legend()
             plt.tight_layout()
-            plt.savefig(os.path.join(output_folder, f"stacked_{loc_name}_year_{year}.png"))
+            plt.savefig(os.path.join(output_folder, f"stacked_{loc_name}_year_{year}.png"), dpi=300)
             plt.close()
 
         print(f"[✓] Plots for {loc_name} saved to: {output_folder}")
@@ -729,17 +1047,21 @@ def get_install_pathways(tech_asset, save_path, tech_name="Tech"):
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(years, new_installed, label="New Installed Capacity", color="#025773")
-    ax.plot(years, total_existing, color="navy", linewidth=2, marker="o", label="Total Existing Capacity")
+    ax.bar(years, new_installed, label="New Installed Capacity", color="#025773", alpha=0.5)
+    ax.plot(years, total_existing, color="#02384A", linewidth=2, marker="o", label="Total Existing Capacity")
 
-    ax.set_title(f"{tech_name} Capacity Installation Pathway")
+    # ax.set_title(f"{tech_name} Capacity Installation Pathway")
     ax.set_xlabel("Year")
     ax.set_ylabel("Capacity [GWp]")
     ax.legend()
     ax.grid(True)
+    # xticks = np.arange(0, 10, 1)
+    # plt.xticks(xticks, xticks, fontsize=12) # plotting validation install paths directly
+    # ax.set_xticklabels(np.arange(1, 11, 1)) # plotting validation install paths directly
+    # plt.yticks(fontsize=12) # plotting validation install paths directly
     plt.tight_layout()
-    plt.show()
-    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name}.png"))
+    #plt.show()
+    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name}.png"), dpi=300)
     
 def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1="Tech 1", tech_name_2="Tech 2"):
     """
@@ -767,7 +1089,7 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
 
     total_1 = cum_1 + exist_1
     total_2 = cum_2 + exist_2
-    years = np.arange(len(new_1))
+    years = np.arange(2025,2055)
     width = 0.35
 
     # Setup figure and axes
@@ -786,8 +1108,8 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
     ax1.set_xlabel("Year")
     ax1.set_ylabel("New Installed Capacity [GWp]", color="gray")
     ax2.set_ylabel("Total Existing Capacity [GWp]", color="black")
-    ax1.set_title("Installed Capacity Pathways")
-    ax1.set_xticks(years)
+    # ax1.set_title("Installed Capacity Pathways")
+    ax1.set_xticks(np.arange(2025, 2056, 5))
     ax1.grid(True, which='major', linestyle='--', alpha=0.5)
 
     # Separate legends
@@ -796,7 +1118,7 @@ def get_dual_install_pathways(tech_asset_1, tech_asset_2, save_path, tech_name_1
     ax2.legend(handles=[line1, line2], title="Total Capacity", bbox_to_anchor=[0.15, 1], loc="upper left")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}.png"))
+    plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}.png"), dpi=300)
     
 def plot_dual_install_pathways_all_locations(my_network, network_structure_df, tech_class_1, tech_class_2, save_path,
                                              tech_name_1="Tech 1", tech_name_2="Tech 2"):
@@ -843,7 +1165,7 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
 
         total_pv = cum_pv + exist_pv
         total_wind = cum_wind + exist_wind
-        years = np.arange(len(new_pv))
+        years = np.arange(2025,2055)
         width = 0.35
 
         # --- Plot ---
@@ -859,8 +1181,8 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
         ax1.set_xlabel("Year")
         ax1.set_ylabel("New Installed Capacity [GWp]", color="gray")
         ax2.set_ylabel("Total Existing Capacity [GWp]", color="black")
-        ax1.set_title(f"Installed Capacity Pathways - Location {loc}")
-        ax1.set_xticks(years)
+        # ax1.set_title(f"Installed Capacity Pathways - Location {loc}")
+        ax1.set_xticks(np.arange(2025, 2056, 5))
         ax1.grid(True, linestyle="--", alpha=0.5)
 
         # Legends
@@ -869,10 +1191,21 @@ def plot_dual_install_pathways_all_locations(my_network, network_structure_df, t
         ax2.legend(handles=[line1, line2], title="Total Capacity", bbox_to_anchor=(0.15, 1), loc="upper left")
 
         plt.tight_layout()
-        plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}_location_{loc}.png"))
+        plt.savefig(os.path.join(save_path, f"Install_pathways_{tech_name_1}_{tech_name_2}_location_{loc}.png"), dpi=300)
         plt.close(fig)  # prevent memory leaks in large runs
 
-        print(f"✅ Saved plot for location {loc}")
-
+        print(f"✅ Saved  installed pathways plot for location {loc}")
     
-    
+def plot_fossil_vs_curtailment(curtailment_df: pd.DataFrame, save_path):
+    years = np.arange(2025,2055)
+    plt.figure(figsize=(10, 6))
+    plt.plot(years, curtailment_df["total_fossil_gen"]/1000, label="Fossil Generation")
+    plt.plot(years, curtailment_df["total_curtailment"]/1000, label="Curtailment")
+    plt.xlabel("Year")
+    plt.ylabel("Total energy (TWh)")
+    plt.xticks(np.arange(2025, 2056, 5))
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, "fossil_vs_curtailment.png"), dpi=300)
+    #plt.show()

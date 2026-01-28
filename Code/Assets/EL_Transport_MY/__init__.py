@@ -5,7 +5,7 @@ Created on Sat May 31 16:36:45 2025
 
 @author: Mónica Sagastuy-Breña
 Based on EL_Transport_Asset by:
-@author: aniqahsan
+    @author: aniqahsan
 """
 
 import os
@@ -111,7 +111,9 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         self.edges = []
         for counter1 in range(self.number_of_edges):
             self.build_edge(counter1)
-            self.build_edge_opposite(counter1)
+        # Build opposite edge once all initial ones are created to follow set of values in self.flows
+        for counter2 in range(self.number_of_edges):
+            self.build_edge_opposite(counter2)
         return
     
     def _get_amortised_sizing_cost(self):
@@ -128,39 +130,73 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             sizing_cost = sizing_constant * cp.max(self.flows)
             annualised_payment = sizing_cost * amort_factor
         except Exception as e:
-            print("Could not update sizing constant, sizing cost or annualised payment")
-        # print("ANNUALISED PAYMENT", annualised_payment)
+            print("Could not update sizing constant, sizing cost or annualised payment:", e)
         try:
-            discount_vector = [(1 + discount_rate) ** -i for i in range(self.start_year, min(self.start_year + n, project_years))]
+            discount_years = range(self.start_year, min(self.start_year + n, project_years))
+            discount_vector = [(1 + discount_rate) ** -i for i in discount_years]
         except Exception as e:
             print("tried getting discount vector but:", e)
         
+        # Store per-year breakdown for later retrieval in results
+        self.capex_payments = [0] * project_years
+        for idx, year in enumerate(discount_years):
+            self.capex_payments[year] = annualised_payment / ((1 + discount_rate) ** year)
+        
+        # Return total cost for optimisation cost calculation
         return annualised_payment * sum(discount_vector)
     
     def _get_discounted_usage_cost(self):
+        """
+        Calculates discounted operational (usage) costs by applying
+        a pre-discounted usage constant vector to yearly flow sums.
+        Ensures consistent net-present-value treatment and avoids
+        double-discounting across years.
+        """
         discount_rate = float(self.network.system_parameters_df.loc["discount_rate", "value"])
         usage_constant = self.cost_fun_params["usage_constant"]
         project_years = self.num_years
-        print("getting year change indices")
+        delay_years = 10  # construction delay, hardcoded now
+        # Sampling scale
         self._get_year_change_indices()
+        year_indices = self.year_change_indices.copy()
+    
+        # Scale factor to convert sampled hours to full-year hours
+        sampled_days_per_year = int((self.number_of_edges / 24) / (project_years - delay_years))
+        simulation_factor = 365 / sampled_days_per_year
+    
+        # Build vector of discounted usage constants for NPV weighting
+        self.usage_constants_discounted = [
+            usage_constant / ((1 + discount_rate) ** y) for y in range(project_years)
+        ]
+        # Initialise storage
         self.usage_costs = []
-        print("going into loop to determine usage NPV cost per year")
         for y in range(project_years):
-            start_idx = self.year_change_indices[y]
-            end_idx = self.year_change_indices[y + 1]  # always safe now
-            
+            # No costs before operation
+            if y < delay_years:
+                self.usage_costs.append(0)
+                continue
+            # Define current operational year for correct indexing
+            op_year = y - delay_years
+            # Year indices (flow windows per sampled days in each year)
+            start_idx = year_indices[op_year]
+            end_idx = year_indices[op_year + 1]
+            # Forward + reverse flow sums
             forward_flow = cp.sum(self.flows[start_idx:end_idx])
             reverse_start = self.number_of_edges + start_idx
             reverse_end = self.number_of_edges + end_idx
             reverse_flow = cp.sum(self.flows[reverse_start:reverse_end])
-            total_flow = forward_flow + reverse_flow
     
-            discounted_cost = (usage_constant * total_flow) / ((1 + discount_rate) ** y)
+            total_flow = forward_flow + reverse_flow
+            total_flow_scaled = total_flow * simulation_factor
+    
+            # Apply pre-discounted usage constant for that year
+            discounted_cost = self.usage_constants_discounted[y] * total_flow_scaled
+    
             self.usage_costs.append(discounted_cost)
     
+        # Return total NPV of usage costs
         return cp.sum(self.usage_costs)
 
-    
     def _update_distance(self):
         #Function that calculates approximate distance between the source and target nodes "as the bird flies"#
         lat_lon_0 = self.network.lat_lon_df.iloc[int(self.source_node_location)]
@@ -222,10 +258,6 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
         year_indices = self.year_change_indices.copy()
         source = self.source_node_location
         target = self.target_node_location
-        sampled_year_hours = year_indices[1] - year_indices[0]
-        reverse_flow_offset = sampled_year_hours * 10 # Assumes always a 10 year lead time for HVDC installation
-       # first_operational_hour = self.source_node_times[0] #if len(self.source_node_times) > 0 else float('inf')
-    
         data = {}
         lengths = []
         
@@ -241,25 +273,15 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
             start_idx = year_indices[y]
             end_idx = year_indices[y + 1]
         
-            if y < 10:  # before operations start, hardcoded, needs to be depending on source node times
-                print(f"Start index at {y}:", start_idx)
-                print(f"End index at {y}:", end_idx)
-                # forward_flow = self.flows[start_idx:end_idx].value
-                # reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
-                # print(f"Forward flow value in year {y}", forward_flow)
-                # print(f"Year {y}: forward_flow shape {forward_flow.shape}")
-                # print(f"Year {y}: reverse_flow shape {reverse_flow.shape}")
+            if y < 10 or (y - 9) >= len(year_indices):
                 forward_flow = np.full(end_idx - start_idx, 0)
                 reverse_flow = np.full(end_idx - start_idx, 0)
             else:
                 start_idx = year_indices[y - 10]
-                end_idx = year_indices[y - 9]
-                print(f"Start index at {y}:", start_idx)
-                print(f"End index at {y}:", end_idx)
+                end_idx = year_indices[y - 9]    
+            
                 forward_flow = self.flows[start_idx:end_idx].value
                 reverse_flow = self.flows[int(max_index + start_idx):int(max_index + end_idx)].value
-                # print(f"Year {y}: forward_flow shape {forward_flow.shape}")
-                # print(f"Year {y}: reverse_flow shape {reverse_flow.shape}")
             data[f"{source}-{target}_year_{real_year}"] = forward_flow
             data[f"{target}-{source}_year_{real_year}"] = reverse_flow
     
@@ -274,3 +296,36 @@ class EL_Transport_MY_Asset(Asset_STEVFNs):
                 data[key] = np.pad(array, (0, max_len - len(array)), constant_values=np.nan)
     
         return pd.DataFrame(data)
+        
+
+    def get_yearly_usage_costs(self):
+        """
+        Returns per-year discounted OPEX (including pre-operation zeros) 
+        from the last call to _get_discounted_usage_cost().
+        """
+        if not hasattr(self, "usage_costs") or len(self.usage_costs) == 0:
+            # Ensure costs are computed if not already done
+            self._get_discounted_usage_cost()
+        cost_list = []
+        # Handle calculated expressions and zeros in self.usage_costs
+        for cost in self.usage_costs:
+            if hasattr(cost, "value"):
+                cost_list.append(cost.value)
+            else:
+                cost_list.append(cost)
+                
+        return cost_list
+    
+    def get_yearly_payments(self):
+        """
+        Returns per-year discounted CAPEX payments (including zeros outside payment years)
+        from the last call to _get_amortised_sizing_cost().
+        """
+        if not hasattr(self, "capex_payments") or len(self.capex_payments) == 0:
+            # Ensure costs are computed if not already done
+            self._get_amortised_sizing_cost()
+        # Handle calculated expressions in self.capex_payments
+        cost_list = []
+        for payment in self.capex_payments:
+            cost_list.append(payment.value)
+        return cost_list

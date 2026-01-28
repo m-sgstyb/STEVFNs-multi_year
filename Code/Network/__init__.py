@@ -85,12 +85,14 @@ class Node_STEVFNs(__Node):
         # ----- ADDING THIS TO ACCESS NODE INFO -----#
         self.node_type = None  # optionally track type
         self.location = None   # optionally track location
+        self.node_time = None  # optionally track time
 
     def __repr__(self):
         return (f"<Node_STEVFNs type={self.node_type} "
                 f"location={self.location} "
                 f"inputs={len(self.input_edges)} "
-                f"outputs={len(self.output_edges)}>")
+                f"outputs={len(self.output_edges)} "
+                f"time={self.node_time}>")
         # ----- END OF EDIT FOR NODE INFO -----#
     
     def build_constraints(self):

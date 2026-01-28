@@ -43,7 +43,18 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         # shape defined in structure
         self.cost_fun_params = {"sizing_constant": cp.Parameter(nonneg=True)}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(nonneg=True)}
-        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(nonneg=True)}
+        self.conversion_fun_params_2 = {"baseline_country_supply": cp.Parameter(nonneg=True,
+                                                                               name=f"baseline_country_supply{self.asset_name}"), 
+                                        "country_supply_growth": cp.Parameter(nonneg=True,
+                                                                               name=f"country_supply_growth{self.asset_name}"),
+                                        "global_supply_growth": cp.Parameter(nonneg=True,
+                                                                               name=f"global_supply_growth{self.asset_name}"),
+                                        "baseline_global_supply": cp.Parameter(nonneg=True,
+                                                                               name=f"baseline_global_supply{self.asset_name}"),
+                                        "first_year_multiplier": cp.Parameter(nonneg=True,
+                                                                               name=f"first_year_multiplier{self.asset_name}"),
+                                        "max_global_share": cp.Parameter(nonneg=True,
+                                                                               name=f"max_global_share{self.asset_name}"),}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
                                                                        name=f"tech_potential_{self.asset_name}")}
         return
@@ -72,9 +83,18 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
                                                                 nonneg=True)}
         self.conversion_fun_params = {"existing_capacity": cp.Parameter(shape=(self.num_years,),
                                                                 nonneg=True, name=f"existingcap_{self.asset_name}"),}
-        self.conversion_fun_params_2 = {"maximum_size": cp.Parameter(shape=(self.num_years,),
-                                                                nonneg=True,
-                                                                name=f"max_size_{self.asset_name}")}
+        self.conversion_fun_params_2 = {"baseline_country_supply": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"baseline_country_supply{self.asset_name}"), 
+                                        "country_supply_growth": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"country_supply_growth{self.asset_name}"),
+                                        "global_supply_growth": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"global_supply_growth{self.asset_name}"),
+                                        "baseline_global_supply": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"baseline_global_supply{self.asset_name}"),
+                                        "first_year_multiplier": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"first_year_multiplier{self.asset_name}"),
+                                        "max_global_share": cp.Parameter(shape=(), nonneg=True,
+                                                                               name=f"max_global_share{self.asset_name}"),}
         self.conversion_fun_params_3 = {"tech_potential": cp.Parameter(nonneg=True,
                                                                        name=f"tech_potential_{self.asset_name}")}
         self.year_change_indices = self._get_year_change_indices()
@@ -116,23 +136,68 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
             * self.gen_profile[edge_number]
         return
     
-    def build_max_capacity_edges(self, year_number):
-        '''
-        Builds edges per year to constrain maximum capacity to be installed per year
-        Explicitly sets edge flow
-        '''
+    def build_max_capacity_edges(self):
+        """
+        Builds the edges to constrain maximum capacity based on the previous year's
+        installs, considering both country ramp limits and global supply growth.
+        The first-year multiplier affects both the ramp limit and the country’s
+        share of the global supply chain. A maximum share of global supply is enforced.
+        """
         source_node_type = self.source_node_type_2
         source_node_location = self.source_node_location_2
         target_node_type = self.target_node_type_2
-        target_node_location = source_node_location
-        
-        source_node_time = 0
-        target_node_time = year_number
-        
-        # Get the installed capacity in that year
-        installed_capacity = self.flows[year_number]
+        target_node_location = self.target_node_location_2
     
-        # Create edge with balance = max_capacity - installed_capacity
+        source_node_time = 0
+        target_node_time = 0
+    
+        # Initial baselines (GW/year for 2024)
+        init_inst_param = self.conversion_fun_params_2["baseline_country_supply"]
+        init_global_param = self.conversion_fun_params_2["baseline_global_supply"]
+    
+        # Growth rates
+        country_growth = self.conversion_fun_params_2["country_supply_growth"]
+        global_growth = self.conversion_fun_params_2["global_supply_growth"]
+    
+        # Maximum allowed fraction of global supply chain for the country
+        max_share = self.conversion_fun_params_2["max_global_share"]
+    
+        # Build vector of "previous installs" (init + flows[...])
+        prev_installs_components = [init_inst_param]
+        prev_installs_components += [self.flows[i] for i in range(self.num_years - 1)]
+        self.prev_installs = cp.hstack(prev_installs_components)  # shape (num_years,)
+    
+        # First year multiplier for ramp
+        first_year_multiplier = self.conversion_fun_params_2["first_year_multiplier"]
+        first_allowed = first_year_multiplier * init_inst_param
+    
+        # --- Country ramp-limited installs ---
+        country_allowable = []
+        for t in range(self.num_years):
+            if t == 0:
+                country_allowable.append(first_allowed)
+            else:
+                country_allowable.append((1.0 + country_growth) * self.prev_installs[t])
+        country_allowable = cp.hstack(country_allowable)
+    
+        # --- Global supply path (based on first_allowed share in year 0) ---
+        country_share = first_allowed / init_global_param
+        global_supply = [init_global_param * country_share]  # year 0 allocation
+        for t in range(1, self.num_years):
+            global_supply.append(global_supply[-1] * (1.0 + global_growth))
+        global_supply = cp.hstack(global_supply)
+    
+    
+        # --- Maximum allowed share of global supply each year (recursive) ---
+        share_cap_list = [max_share * init_global_param]  # year 0
+        for t in range(1, self.num_years):
+            share_cap_list.append(share_cap_list[-1] * (1 + global_growth))
+        share_cap = cp.hstack(share_cap_list)
+            
+        # --- Interaction: min of country ramp, global allocation, and max share ---
+        self.allowable_installs = cp.minimum(country_allowable,share_cap)
+    
+        # Create / append an edge that represents allowable_installs - actual installs
         edge = Edge_STEVFNs()
         self.edges.append(edge)
     
@@ -145,15 +210,72 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
             edge.attach_target_node(
                 self.network.extract_node(target_node_location, target_node_type, target_node_time)
             )
-        # Define flow as max capacity minus actual installed capacity
-        max_capacity_param = self.conversion_fun_params_2["maximum_size"]
-        edge.flow = max_capacity_param[year_number] - installed_capacity
+    
+        # Set the flow expression to allowable - actual installs (vector)
+        edge.flow = self.allowable_installs - self.flows
+    
+    # def build_max_capacity_edges(self):
+    #     """
+    #     Builds the edges to constrain maximum capacity based on the previous year's
+    #     installed
+
+    #     Returns
+    #     -------
+    #     None.
+
+    #     """
+    #     source_node_type = self.source_node_type_2
+    #     source_node_location = self.source_node_location_2
+    #     target_node_type = self.target_node_type_2
+    #     target_node_location = self.target_node_location_2
+        
+    #     source_node_time = 0
+    #     # target_node_time = year_number
+    #     target_node_time = 0
+        
+    #     # init_inst_param = 0.4142 # hard coded, make parameters
+    #     init_inst_param = self.conversion_fun_params_2["baseline_annual_supply"]
+    #     # growth_rate = 0.2 # hard coded, make parameters
+    #     growth_rate = self.conversion_fun_params_2["allowed_annual_supply_growth"]
+
+    #     if self.num_years < 1:
+    #         return
+    #     prev_installs_components = [init_inst_param]
+    #     if self.num_years > 1:
+    #         prev_installs_components += [self.flows[i] for i in range(self.num_years - 1)]
+    #     prev_installs = cp.hstack(prev_installs_components)  # shape (num_years,)
+        
+    #     first_year_multiplier = 3
+    #     first_allowed = first_year_multiplier * init_inst_param
+    #     allowable_list = []
+    #     for t in range(self.num_years):
+    #         if t == 0:
+    #             allowable_list.append(first_allowed)
+    #         else:
+    #             # prev_installs[t] corresponds to flows[t-1]
+    #             allowable_list.append((1.0 + growth_rate) * prev_installs[t])
+    #     allowable_installs = cp.hstack(allowable_list)  # shape (num_years,)
+    
+    #     # Create / append an edge that represents allowable_installs - actual installs
+    #     edge = Edge_STEVFNs()
+    #     self.edges.append(edge)
+    #     if source_node_type != "NULL":
+    #             edge.attach_source_node(
+    #                 self.network.extract_node(source_node_location, source_node_type, source_node_time)
+    #             )
+        
+    #     if target_node_type != "NULL":
+    #         edge.attach_target_node(
+    #             self.network.extract_node(target_node_location, target_node_type, target_node_time)
+    #         )
+    #         # Set the flow expression to allowable - actual installs (vector)
+    #     edge.flow = allowable_installs - self.flows
         
     def build_tech_potential_edges(self, year_number):
         source_node_type = "NULL"
         source_node_location = self.source_node_location_2
         target_node_type = "RE_WIND_Tech"
-        target_node_location = source_node_location
+        target_node_location = self.target_node_location_2
         
         source_node_time = 0
         target_node_time = year_number
@@ -184,8 +306,10 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         self.edges = []
         for hour in range(self.number_of_edges):
             self.build_edge(hour)
-        for year in range(self.num_years):
-            self.build_max_capacity_edges(year)
+        self.build_max_capacity_edges()
+        # for year in range(self.num_years):
+        #     self.build_max_capacity_edges(year)
+        for year in range(self.num_years):    
             self.build_tech_potential_edges(year)
         return
     
@@ -200,16 +324,6 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         '''
         Calculates total discounted and amortised cost scaled for representative timesteps.
         '''
-    
-        # Cost per year (learning curve)
-        # cost_array = np.array([1.2835973944705823,1.20310956244145,1.1313223980206035,1.0677793433734775,1.0119102964812567,
-        #                        0.9630779381406271,0.9206159970372159,0.8838590173417371,0.8521641165486235,0.8249257546673787,
-        #                        0.801584763549205,0.7816329019733418,0.7646140923071025,0.7501233226560129,0.7378040084937985,
-        #                        0.7273444264992114,0.7184736745171729,0.7109574803590637,0.7045940785086442,0.6992102949078827,
-        #                        0.6946579219265903,0.6908104242604939,0.6875599880763865,0.6848149070068594,0.6824972869739733,
-        #                        0.6805410452430902,0.6788901760181308,0.6774972541330668,0.6763221491340373,0.6753309236877535]) # Hard-coded for testing
-    
-        
         cost_array = self.cost_fun_params["sizing_constant"]
         asset_lifetime = 20  # years
         interest_rate = float(self.network.system_parameters_df.loc["interest_rate", "value"])
@@ -222,15 +336,13 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         amort_factor = (r * (1 + r) ** n) / ((1 + r) ** n - 1)
     
         amortised_cost = cost_array * amort_factor  # shape (project_years,)
-    
         # Create index matrices for payment timing
         i, j = np.meshgrid(np.arange(project_years), np.arange(project_years), indexing='ij')
-        # discount_factor = (1 + discount_rate) ** (i - j) # This was discounting to year j, not year 0
-        discount_factor = (1 + discount_rate) ** i # This discounts to year 0
+        discount_factor = (1 + discount_rate) ** i # Discounting to year 0
         valid_mask = (i >= j) & (i < j + asset_lifetime)
     
-        amortised_j = cp.reshape(amortised_cost, (1, project_years))  # shape (1, years)
-        flows_j = cp.reshape(self.flows, (1, project_years))  # shape (1, years)
+        amortised_j = cp.reshape(amortised_cost, (1, project_years), order="F")  # shape (1, years)
+        flows_j = cp.reshape(self.flows, (1, project_years), order="F")  # shape (1, years)
     
         raw_payments = cp.multiply(flows_j, amortised_j) / discount_factor
         self.payments_M = cp.multiply(raw_payments, valid_mask)
@@ -367,13 +479,4 @@ class RE_WIND_MY_Asset(Asset_STEVFNs):
         # yearly_flows = [flow * simulation_factor for flow in yearly_flows]
         yearly_flows = [flow for flow in yearly_flows]
         return yearly_flows
-    
-    def _get_install_pathways(self):
-        '''
-        Extracts results and plots the new capacity installed each year
-        while tracking total installed capacity 
-        '''
-        new_installed = self.flows
-        total_existing = self.cumulative_new_installed + self.conversion_fun_params["existing_capacity"]
-    
     

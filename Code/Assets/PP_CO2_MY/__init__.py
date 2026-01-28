@@ -86,8 +86,8 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         source_node_type = self.source_node_type
         target_node_type = self.target_node_type_2
         source_node_location = self.source_node_location
-        target_node_location = 0  # Assuming global co2 budget in location 0
-        # target_node_location = source_node_location # assuming individual CO2 budgets in each country when collaborating
+        # target_node_location = 0  # Assuming global co2 budget in location 0
+        target_node_location = source_node_location # assuming individual CO2 budgets in each country when collaborating
     
         source_node_time = year_number
         target_node_time = year_number
@@ -216,7 +216,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
             for start, end in zip(year_indices[:-1], year_indices[1:])
         ]
     
-        return yearly_costs  # length = num_years
+        return yearly_costs[:self.num_years]  # length = num_years
 
     
     def process_csv_values(self,values):
@@ -264,7 +264,7 @@ class PP_CO2_MY_Asset(Asset_STEVFNs):
         annual_emissions = [-self.edges[i].flow.value for i in range(emissions_edges_start,
                                                                     emissions_edges_end)]
         return annual_emissions
-    
+        
     def get_yearly_flows(self):
         """
         Returns a list of flow slices split by each year using year_change_indices

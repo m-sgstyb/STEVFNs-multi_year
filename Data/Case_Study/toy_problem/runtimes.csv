@@ -1,0 +1,2 @@
+Case_study,scenario,build_time_s,build_time_min,update_time_s,update_time_min,solve_time_s,solve_time_min,full_time_s,full_time_min
+toy_problem,validation_test,2.4825527667999268,0.041375879446665445,0.021837949752807617,0.00036396582921346027,3.402453899383545,0.05670756498972575,5.915440797805786,0.09859067996342977

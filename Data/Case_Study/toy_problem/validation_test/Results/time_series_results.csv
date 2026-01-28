@@ -1,0 +1,11 @@
+,year,scenario,Annual_Emissions,Total_Annual_Demand,Discounted_Annual_Demand,Total_Annual_Fossil_Gen_GWh,Discounted_Annual_Fossil_Gen_GWh,System_LCOE_USD_per_kWh,System_LCUE_USD_per_kWh
+0,1,validation_test,0,2627.9999999999995,2627.9999999999995,0,0,,0.0
+1,2,validation_test,0,2890.8,2753.1428571428573,0,0,,0.0
+2,3,validation_test,0,3179.88,2884.2448979591836,0,0,,0.0
+3,4,validation_test,0,3497.868,3021.589893100097,0,0,,0.0
+4,5,validation_test,0,3847.6548000000003,3165.4751261048636,0,0,,0.0
+5,6,validation_test,0,4232.420280000001,3316.212036871762,0,0,,0.0
+6,7,validation_test,0,4655.662307999999,3474.1268957704156,0,0,,0.0
+7,8,validation_test,0,5121.228538799999,3639.5615098547214,0,0,,0.0
+8,9,validation_test,0,5633.351392679999,3812.873962704946,0,0,,0.0
+9,10,validation_test,0,6196.68652932,3994.439387806388,0,0,,0.0

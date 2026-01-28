@@ -1,0 +1,5 @@
+,scenario,asset_name,total_system_cost_BUSD,total_capex_BUSD,total_opex_BUSD,total_cost_BUSD,total_emissions_MtCO2e
+0,USA_maxRE_high,RE_PV_MY,556.0017566352377,0.0,0.0,0.0,0.0
+1,USA_maxRE_high,RE_WIND_MY,556.0017566352377,0.0,0.0,0.0,0.0
+2,USA_maxRE_high,PP_CO2_MY,556.0017566352377,0.0,556.0017566352375,556.0017566352375,9155.628988270637
+3,USA_maxRE_high,EL_Demand_MY,556.0017566352377,0.0,0.0,0.0,0.0
